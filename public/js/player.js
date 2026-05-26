@@ -6,6 +6,8 @@ const ITVPlayer = (() => {
   let currentVideoId = null;
   let lastSyncSignature = null;
   let onEndedCallback = null;
+  let volumeLevel = 80;
+  let volumeMuted = false;
   const queue = [];
 
   function syncSignature(payload) {
@@ -38,6 +40,9 @@ const ITVPlayer = (() => {
         modestbranding: 1,
       },
       events: {
+        onReady() {
+          applyVolume();
+        },
         onStateChange(event) {
           if (event.data === YT.PlayerState.ENDED && onEndedCallback) {
             onEndedCallback();
@@ -45,6 +50,30 @@ const ITVPlayer = (() => {
         },
       },
     });
+  }
+
+  function applyVolume() {
+    if (!ytPlayer?.setVolume) return;
+    if (volumeMuted || volumeLevel === 0) {
+      ytPlayer.mute?.();
+      return;
+    }
+    ytPlayer.unMute?.();
+    ytPlayer.setVolume(volumeLevel);
+  }
+
+  function setVolume(level, muted) {
+    volumeLevel = Math.max(0, Math.min(100, Math.round(level)));
+    volumeMuted = !!muted || volumeLevel === 0;
+    whenReady(() => {
+      ensurePlayer();
+      applyVolume();
+    });
+    return { volume: volumeLevel, muted: volumeMuted };
+  }
+
+  function getVolume() {
+    return { volume: volumeLevel, muted: volumeMuted };
   }
 
   function isAlreadyPlaying() {
@@ -111,5 +140,5 @@ const ITVPlayer = (() => {
     return ytPlayer.getCurrentTime() || 0;
   }
 
-  return { sync, setOnEnded, whenReady, getCurrentTime };
+  return { sync, setOnEnded, whenReady, getCurrentTime, setVolume, getVolume };
 })();

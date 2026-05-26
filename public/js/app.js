@@ -1,5 +1,7 @@
 (function () {
   const STORAGE_NAME = 'itv-displayName';
+  const STORAGE_VOLUME = 'itv-volume';
+  const STORAGE_MUTED = 'itv-muted';
 
   const $ = (sel) => document.querySelector(sel);
   const show = (el, visible) => el?.classList.toggle('hidden', !visible);
@@ -493,6 +495,59 @@
     }
   });
 
+  function initVolumeControl() {
+    const slider = $('#volume-slider');
+    const muteBtn = $('#btn-volume-mute');
+    if (!slider || !muteBtn) return;
+
+    let storedVol = parseInt(localStorage.getItem(STORAGE_VOLUME), 10);
+    if (Number.isNaN(storedVol)) storedVol = 80;
+    let muted = localStorage.getItem(STORAGE_MUTED) === '1';
+
+    slider.value = storedVol;
+    ITVPlayer.setVolume(storedVol, muted);
+    updateVolumeUi(muted);
+
+    function persist(vol, isMuted) {
+      localStorage.setItem(STORAGE_VOLUME, String(vol));
+      localStorage.setItem(STORAGE_MUTED, isMuted ? '1' : '0');
+    }
+
+    function updateVolumeUi(isMuted) {
+      muteBtn.classList.toggle('is-muted', isMuted);
+      muteBtn.setAttribute('aria-pressed', String(isMuted));
+      muteBtn.title = isMuted ? 'Unmute' : 'Mute';
+      muteBtn.setAttribute('aria-label', muteBtn.title);
+    }
+
+    slider.addEventListener('input', () => {
+      const vol = parseInt(slider.value, 10);
+      const isMuted = vol === 0;
+      storedVol = isMuted ? storedVol || 80 : vol;
+      ITVPlayer.setVolume(vol, isMuted);
+      persist(isMuted ? storedVol : vol, isMuted);
+      updateVolumeUi(isMuted);
+    });
+
+    muteBtn.addEventListener('click', () => {
+      const current = ITVPlayer.getVolume();
+      if (current.muted) {
+        const restore = storedVol > 0 ? storedVol : 80;
+        ITVPlayer.setVolume(restore, false);
+        slider.value = restore;
+        storedVol = restore;
+        persist(restore, false);
+        updateVolumeUi(false);
+        return;
+      }
+
+      storedVol = current.volume > 0 ? current.volume : storedVol;
+      ITVPlayer.setVolume(storedVol, true);
+      persist(storedVol, true);
+      updateVolumeUi(true);
+    });
+  }
+
   ITVPlayer.setOnEnded(() => {
     if (socket?.connected) socket.emit('player:ended');
   });
@@ -518,6 +573,7 @@
 
   const existing = getDisplayName();
   initPlaylistDragDrop();
+  initVolumeControl();
   if (existing.length >= 2) {
     connectSocket(existing);
   } else {

@@ -293,15 +293,80 @@ a:hover {
 }
 
 .dj-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.25rem 0.6rem;
   background: linear-gradient(90deg, var(--purple-dim), var(--void-panel));
   border: 1px solid var(--void-border);
   border-radius: var(--radius);
   font-size: 0.75rem;
   line-height: 1.3;
+  overflow: hidden;
+}
+
+.dj-banner__info {
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.volume-block {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid rgba(42, 38, 64, 0.85);
+}
+
+.volume-mute {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--void-border);
+  border-radius: 4px;
+  color: var(--grey-muted);
+  cursor: pointer;
+}
+
+.volume-mute:hover {
+  color: var(--purple-bright);
+  border-color: var(--purple-bright);
+}
+
+.volume-mute svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.volume-mute__off {
+  display: none;
+}
+
+.volume-mute.is-muted .volume-mute__on {
+  display: none;
+}
+
+.volume-mute.is-muted .volume-mute__off {
+  display: block;
+}
+
+.volume-block input[type='range'] {
+  width: 76px;
+  accent-color: var(--purple-bright);
+  height: 1rem;
+  margin: 0;
+  cursor: pointer;
 }
 
 .dj-banner strong {
