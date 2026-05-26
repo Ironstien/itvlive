@@ -1,0 +1,25 @@
+:root {
+  --void-black: #050508;
+  --void-deep: #0e0c14;
+  --void-panel: #14121c;
+  --void-border: #2a2640;
+  --purple-bright: #9b5de5;
+  --purple-mid: #7b2cbf;
+  --purple-dim: #5a189a;
+  --grey-text: #b8b8c8;
+  --grey-muted: #6b6b80;
+  --flame: #ff6b35;
+  --danger: #e63946;
+  --success: #2ec4b6;
+  --font-display: "Segoe UI", system-ui, sans-serif;
+  --font-body: "Segoe UI", system-ui, sans-serif;
+  --radius: 8px;
+  --shadow-glow: 0 0 24px rgba(155, 93, 229, 0.25);
+  --side-panel-width: 312px;
+  --vinyl-pit-height: 220px;
+  --player-max-width: 420px;
+  --player-max-height: 236px;
+  --void-bg-base: #030304;
+  --void-bg-glow: rgba(74, 28, 120, 0.07);
+  --void-bg-glow-deep: rgba(36, 12, 62, 0.11);
+}
