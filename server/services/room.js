@@ -1,4 +1,4 @@
-const { parseYoutubeId, fetchYoutubeMeta } = require('./youtube');
+const { parseYoutubeId, fetchYoutubeMeta, youtubeThumbnailUrl } = require('./youtube');
 
 const MAX_CHAT = 80;
 const MAX_MESSAGE_LEN = 280;
@@ -12,6 +12,7 @@ class Room {
     this.chat = [];
     this._queueId = 0;
     this._chatId = 0;
+    this._lastFinishedAt = null;
   }
 
   addUser(socketId, displayName) {
@@ -29,14 +30,11 @@ class Room {
   }
 
   removeUser(socketId) {
-    this.leaveQueue(socketId);
+    const { playlistSyncFor = null } = this.leaveQueue(socketId);
     this.globalQueue = this.globalQueue.filter((e) => e.socketId !== socketId);
     this.users.delete(socketId);
     this.playlists.delete(socketId);
-    if (this.nowPlaying?.socketId === socketId) {
-      this.nowPlaying = null;
-      this._tryStartNext();
-    }
+    return { playlistSyncFor };
   }
 
   setDisplayName(socketId, name) {
@@ -45,6 +43,12 @@ class Room {
     const trimmed = String(name || '').trim().slice(0, 24);
     if (trimmed.length < 2) return { error: 'Name must be at least 2 characters' };
     user.displayName = trimmed;
+    this.globalQueue.forEach((entry) => {
+      if (entry.socketId === socketId) entry.djName = trimmed;
+    });
+    if (this.nowPlaying?.socketId === socketId) {
+      this.nowPlaying.djName = trimmed;
+    }
     return { ok: true };
   }
 
@@ -73,6 +77,8 @@ class Room {
       videoId: meta.videoId,
       title: meta.title,
       thumbnail: meta.thumbnail,
+      channel: meta.channel,
+      duration: meta.duration,
     };
     pl.push(item);
     this.playlists.set(socketId, pl);
@@ -105,7 +111,9 @@ class Room {
       id: `${socketId}-${Date.now()}`,
       videoId: this.nowPlaying.videoId,
       title: this.nowPlaying.title,
-      thumbnail: null,
+      thumbnail: youtubeThumbnailUrl(this.nowPlaying.videoId),
+      channel: null,
+      duration: null,
     };
     pl.push(item);
     this.playlists.set(socketId, pl);
@@ -119,39 +127,46 @@ class Room {
     if (pl.length === 0) return { error: 'Add at least one song to your playlist first' };
     if (user.inQueue) return { error: 'You are already in the DJ queue' };
     if (this.globalQueue.some((e) => e.socketId === socketId)) {
-      user.inQueue = true;
-      return { error: 'You already have a song waiting in the queue' };
+      return { error: 'You are already in the DJ queue' };
+    }
+    if (this.nowPlaying?.socketId === socketId) {
+      return { error: 'You are already playing' };
     }
 
-    const head = pl[0];
     this._queueId += 1;
     this.globalQueue.push({
       id: this._queueId,
       socketId,
       djName: user.displayName,
-      videoId: head.videoId,
-      title: head.title,
     });
     user.inQueue = true;
 
-    if (!this.nowPlaying) this._tryStartNext();
-    return { ok: true };
+    if (this.nowPlaying) {
+      this._moveQueueUserToBottom(this.nowPlaying.socketId);
+    } else {
+      const playlistSyncFor = this._tryStartNext();
+      return { ok: true, playlistSyncFor };
+    }
+    return { ok: true, playlistSyncFor: null };
   }
 
   leaveQueue(socketId) {
     const user = this.users.get(socketId);
     if (user) user.inQueue = false;
     this.globalQueue = this.globalQueue.filter((e) => e.socketId !== socketId);
-    return { ok: true };
+    let playlistSyncFor = null;
+    if (this.nowPlaying?.socketId === socketId) {
+      playlistSyncFor = this._finishCurrentTrack(socketId);
+    }
+    return { ok: true, playlistSyncFor };
   }
 
   skipMine(socketId) {
-    const idx = this.globalQueue.findIndex((e) => e.socketId === socketId);
-    if (idx === -1) return { error: 'You have no song in the queue' };
-    this.globalQueue.splice(idx, 1);
     const user = this.users.get(socketId);
-    if (user) user.inQueue = false;
-    return { ok: true };
+    if (!user?.inQueue) {
+      return { error: 'You are not in the DJ queue' };
+    }
+    return this.leaveQueue(socketId);
   }
 
   skipCurrent(socketId) {
@@ -162,8 +177,8 @@ class Room {
     if (!isOwner && !isAdmin) {
       return { error: 'Only the current DJ can skip this song' };
     }
-    this._finishCurrentTrack();
-    return { ok: true };
+    const playlistSyncFor = this._finishCurrentTrack(this.nowPlaying.socketId);
+    return { ok: true, playlistSyncFor };
   }
 
   addChat(socketId, text) {
@@ -185,43 +200,80 @@ class Room {
   }
 
   onTrackEnded() {
-    this._finishCurrentTrack();
+    if (!this.nowPlaying) return null;
+    const trackKey = `${this.nowPlaying.socketId}:${this.nowPlaying.startedAt}`;
+    if (this._lastFinishedAt === trackKey) return null;
+    this._lastFinishedAt = trackKey;
+    return this._finishCurrentTrack(this.nowPlaying.socketId);
   }
 
-  _finishCurrentTrack() {
-    const np = this.nowPlaying;
-    if (np) {
-      const pl = this.playlists.get(np.socketId);
-      if (pl?.length && pl[0].videoId === np.videoId) {
-        const first = pl.shift();
-        pl.push(first);
-      }
-      const user = this.users.get(np.socketId);
-      if (user) user.inQueue = false;
-    }
+  _consumePlaylistHead(socketId) {
+    const pl = this.playlists.get(socketId) || [];
+    if (pl.length === 0) return null;
+    const head = pl.shift();
+    pl.push(head);
+    return head;
+  }
+
+  _moveQueueUserToBottom(socketId) {
+    const idx = this.globalQueue.findIndex((e) => e.socketId === socketId);
+    if (idx === -1 || idx === this.globalQueue.length - 1) return;
+    const [entry] = this.globalQueue.splice(idx, 1);
+    this.globalQueue.push(entry);
+  }
+
+  _rotateQueueHeadToTail() {
+    if (this.globalQueue.length === 0) return;
+    const entry = this.globalQueue.shift();
+    this.globalQueue.push(entry);
+  }
+
+  _finishCurrentTrack(finishedSocketId = null) {
     this.nowPlaying = null;
-    this._tryStartNext();
+    if (
+      finishedSocketId &&
+      this.globalQueue.length > 1 &&
+      this.globalQueue[0]?.socketId === finishedSocketId
+    ) {
+      this._moveQueueUserToBottom(finishedSocketId);
+    }
+    return this._tryStartNext();
   }
 
   _tryStartNext() {
-    if (this.nowPlaying) return;
+    if (this.nowPlaying || this.globalQueue.length === 0) return null;
 
-    while (this.globalQueue.length > 0) {
-      const next = this.globalQueue.shift();
+    const attempts = this.globalQueue.length;
+    for (let i = 0; i < attempts; i += 1) {
+      const next = this.globalQueue[0];
+      if (!next) break;
+
       const user = this.users.get(next.socketId);
-      if (!user) continue;
+      if (!user?.inQueue) {
+        this.globalQueue.shift();
+        continue;
+      }
+
+      const head = this._consumePlaylistHead(next.socketId);
+      if (!head) {
+        this._rotateQueueHeadToTail();
+        continue;
+      }
 
       this.nowPlaying = {
         queueEntryId: next.id,
         socketId: next.socketId,
-        djName: next.djName,
-        videoId: next.videoId,
-        title: next.title,
+        djName: user.displayName,
+        videoId: head.videoId,
+        title: head.title,
         startedAt: Date.now(),
       };
-      user.inQueue = false;
-      return;
+
+      this._moveQueueUserToBottom(next.socketId);
+      return next.socketId;
     }
+
+    return null;
   }
 
   getPlayerSync() {
@@ -241,6 +293,7 @@ class Room {
     return {
       nowPlaying: this.nowPlaying
         ? {
+            socketId: this.nowPlaying.socketId,
             djName: this.nowPlaying.djName,
             title: this.nowPlaying.title,
             videoId: this.nowPlaying.videoId,
@@ -249,9 +302,8 @@ class Room {
         : null,
       globalQueue: this.globalQueue.map((e) => ({
         id: e.id,
+        socketId: e.socketId,
         djName: e.djName,
-        title: e.title,
-        videoId: e.videoId,
       })),
       users: [...this.users.values()].map((u) => ({
         socketId: u.socketId,

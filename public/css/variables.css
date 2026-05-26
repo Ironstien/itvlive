@@ -22,4 +22,6 @@
   --void-bg-base: #030304;
   --void-bg-glow: rgba(74, 28, 120, 0.07);
   --void-bg-glow-deep: rgba(36, 12, 62, 0.11);
+  --scrollbar-track: #3a1458;
+  --scrollbar-thumb: #ffffff;
 }

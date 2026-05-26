@@ -33,7 +33,10 @@
 
     <main class="stage">
       <aside class="panel panel-playlist">
-        <div class="panel-header">Your Playlist</div>
+        <div class="panel-header panel-header-with-action">
+          <span>Your Playlist</span>
+          <button type="button" id="btn-rip" class="btn-ghost btn-sm">Rip current song</button>
+        </div>
         <div class="panel-body panel-playlist-body">
           <form id="playlist-form" class="playlist-form">
             <input
@@ -44,47 +47,55 @@
             />
             <button type="submit" class="btn-primary btn-sm">Add</button>
           </form>
-          <ul id="playlist-list" class="playlist-list"></ul>
-          <button type="button" id="btn-rip" class="btn-ghost btn-sm">Rip current song</button>
-          <p id="playlist-error" class="form-error hidden"></p>
-          <span class="status-pill" id="server-status">Connecting…</span>
+          <div class="playlist-scroll">
+            <ul id="playlist-list" class="playlist-list"></ul>
+          </div>
         </div>
       </aside>
 
       <section class="stage-center">
         <div class="player-zone">
-          <div class="player-wrap">
-            <div id="yt-player"></div>
-            <div id="player-idle" class="player-idle">
-              <p>No track playing</p>
-              <p><small>Add songs and join the DJ queue</small></p>
+          <div class="player-stack">
+            <div class="player-ambient" id="player-ambient" aria-hidden="true">
+              <img class="player-ambient__img" id="player-ambient-img" alt="" />
+            </div>
+            <div class="player-wrap">
+              <div id="yt-player"></div>
+              <div id="player-idle" class="player-idle">
+                <p>No track playing</p>
+                <p><small>Add songs and join the DJ queue</small></p>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="now-playing-block">
-          <div class="dj-banner" id="dj-banner">
-            <strong>DJ:</strong> <span id="dj-name">—</span> &nbsp;|&nbsp;
-            <strong>Now playing:</strong> <span id="now-title">—</span>
+          <div class="dj-banner-stack">
+            <p id="control-toast" class="control-toast hidden"></p>
+            <div class="dj-banner" id="dj-banner">
+              <strong>DJ:</strong> <span id="dj-name">—</span> &nbsp;|&nbsp;
+              <strong>Now playing:</strong> <span id="now-title">—</span>
+            </div>
           </div>
 
           <div class="controls-row">
-            <button type="button" class="media-btn" id="btn-join-queue" title="Join DJ queue (top playlist song)">
-              ▶
+            <button type="button" class="btn-primary btn-sm btn-queue-action" id="btn-queue-action" data-mode="join">
+              Join Queue
             </button>
-            <button type="button" class="media-btn" id="btn-leave-queue" title="Leave DJ queue">⏩</button>
-            <button type="button" class="media-btn" id="btn-skip-current" title="Skip now playing (current DJ only)">
-              ⏹
-            </button>
-            <button type="button" class="media-btn" id="btn-skip-mine" title="Remove my song from queue">⏪</button>
 
             <div class="vote-block">
               <label for="vote-slider">Vote (1–100)</label>
               <input type="range" id="vote-slider" min="1" max="100" value="50" disabled />
               <span class="vote-value"><span id="vote-value">50</span> <small>(Ph.2)</small></span>
             </div>
+
+            <div class="air-sign air-sign--listening" id="air-sign" aria-live="polite">
+              <span class="air-sign__plate">
+                <span class="air-sign__glow" aria-hidden="true"></span>
+                <span class="air-sign__text">Listening</span>
+              </span>
+            </div>
           </div>
-          <p id="control-toast" class="control-toast hidden"></p>
         </div>
       </section>
 
@@ -105,7 +116,11 @@
           <ul id="online-list" class="online-list"></ul>
         </div>
         <div class="panel-body chat-pane" data-pane="queue">
-          <ol id="global-queue-list" class="queue-list"></ol>
+          <div id="queue-now-playing" class="queue-now-playing hidden">
+            <div class="queue-section-label">Now Playing</div>
+            <div id="queue-now-dj" class="queue-now-dj"></div>
+          </div>
+          <ul id="global-queue-list" class="queue-list"></ul>
         </div>
       </aside>
 
@@ -118,6 +133,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="/js/player.js"></script>
+    <script src="/js/ambient.js"></script>
     <script src="/js/app.js"></script>
   </body>
 </html>

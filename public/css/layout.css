@@ -2,6 +2,27 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.85);
 }
 
 html,
@@ -148,11 +169,46 @@ a:hover {
   flex-shrink: 0;
 }
 
+.panel-header-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.panel-header-with-action .btn-ghost {
+  margin-top: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
 .panel-body {
   flex: 1;
   padding: 0.65rem;
   overflow: auto;
   min-height: 0;
+}
+
+.panel-playlist-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0.65rem 0.65rem 0.65rem 0;
+}
+
+.panel-playlist-body .playlist-form {
+  flex-shrink: 0;
+  padding-left: 0.65rem;
+}
+
+.playlist-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  direction: rtl;
+  padding-left: 0.65rem;
 }
 
 .panel-chat {
@@ -186,21 +242,31 @@ a:hover {
   align-items: center;
   justify-content: center;
   padding: 0.25rem 0;
+  position: relative;
+  overflow: visible;
 }
 
-.player-wrap {
+.player-stack {
+  position: relative;
   flex-shrink: 0;
   width: min(100%, var(--player-max-width));
   max-height: min(var(--player-max-height), 100%);
   aspect-ratio: 16 / 9;
   height: auto;
+}
+
+.player-wrap {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
   background: #000;
   border-radius: var(--radius);
   border: 1px solid var(--void-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-glow);
+  overflow: hidden;
 }
 
 .player-placeholder {
@@ -218,6 +284,12 @@ a:hover {
   flex-direction: column;
   gap: 0.3rem;
   padding-top: 0.25rem;
+  overflow: visible;
+}
+
+.dj-banner-stack {
+  position: relative;
+  flex-shrink: 0;
 }
 
 .dj-banner {
@@ -240,18 +312,13 @@ a:hover {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
 }
 
-.media-btn {
-  width: 32px;
-  height: 32px;
+.btn-queue-action {
   flex-shrink: 0;
-  border-radius: 50%;
-  border: 1px solid var(--void-border);
-  background: var(--void-deep);
-  color: var(--grey-text);
-  font-size: 0.75rem;
+  min-width: 6.5rem;
+  white-space: nowrap;
 }
 
 .vote-block {
@@ -275,7 +342,7 @@ a:hover {
 
 .vote-block input[type='range'] {
   flex: 1;
-  min-width: 60px;
+  min-width: 40px;
   accent-color: var(--purple-bright);
   height: 1rem;
 }
@@ -375,7 +442,7 @@ a:hover {
     max-height: 220px;
   }
 
-  .player-wrap {
+  .player-stack {
     max-width: 100%;
     max-height: min(200px, 40vw);
   }

@@ -106,5 +106,10 @@ const ITVPlayer = (() => {
     onEndedCallback = fn;
   }
 
-  return { sync, setOnEnded, whenReady };
+  function getCurrentTime() {
+    if (!ytPlayer?.getCurrentTime) return 0;
+    return ytPlayer.getCurrentTime() || 0;
+  }
+
+  return { sync, setOnEnded, whenReady, getCurrentTime };
 })();

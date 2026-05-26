@@ -5,6 +5,17 @@ const room = new Room();
 const chatLastSent = new Map();
 const CHAT_COOLDOWN_MS = 800;
 
+function syncPlaylistFor(io, socketId) {
+  if (!socketId) return;
+  const playlist = room.getPlaylist(socketId);
+  const target = io.sockets.sockets.get(socketId);
+  if (target) {
+    target.emit('playlist:sync', playlist);
+    return;
+  }
+  io.to(socketId).emit('playlist:sync', playlist);
+}
+
 function broadcast(io) {
   broadcastRoom(io);
 }
@@ -73,6 +84,7 @@ function registerSockets(httpServer) {
       const result = room.joinQueue(socket.id);
       if (typeof ack === 'function') ack(result);
       if (result.ok) {
+        syncPlaylistFor(io, result.playlistSyncFor);
         broadcast(io);
         emitPlayerSync(io);
       }
@@ -81,7 +93,11 @@ function registerSockets(httpServer) {
     socket.on('queue:leave', (_payload, ack) => {
       const result = room.leaveQueue(socket.id);
       if (typeof ack === 'function') ack(result);
-      if (result.ok) broadcast(io);
+      if (result.ok) {
+        syncPlaylistFor(io, result.playlistSyncFor);
+        broadcast(io);
+        if (result.playlistSyncFor) emitPlayerSync(io);
+      }
     });
 
     socket.on('queue:skip-mine', (_payload, ack) => {
@@ -94,6 +110,7 @@ function registerSockets(httpServer) {
       const result = room.skipCurrent(socket.id);
       if (typeof ack === 'function') ack(result);
       if (result.ok) {
+        syncPlaylistFor(io, result.playlistSyncFor);
         broadcast(io);
         emitPlayerSync(io);
       }
@@ -119,7 +136,8 @@ function registerSockets(httpServer) {
 
     socket.on('player:ended', () => {
       if (!room.nowPlaying) return;
-      room.onTrackEnded();
+      const playlistSyncFor = room.onTrackEnded();
+      syncPlaylistFor(io, playlistSyncFor);
       broadcast(io);
       emitPlayerSync(io);
     });
@@ -128,7 +146,8 @@ function registerSockets(httpServer) {
       chatLastSent.delete(socket.id);
       const hadNowPlaying = !!room.nowPlaying;
       const wasDj = room.nowPlaying?.socketId === socket.id;
-      room.removeUser(socket.id);
+      const { playlistSyncFor = null } = room.removeUser(socket.id);
+      syncPlaylistFor(io, playlistSyncFor);
       broadcast(io);
       if (hadNowPlaying && (wasDj || !room.nowPlaying)) emitPlayerSync(io);
     });

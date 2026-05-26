@@ -4,22 +4,12 @@
   const $ = (sel) => document.querySelector(sel);
   const show = (el, visible) => el?.classList.toggle('hidden', !visible);
 
-  function setServerStatus(text, isError) {
-    const el = $('#server-status');
-    if (!el) return;
-    el.textContent = text;
-    el.style.borderColor = isError ? 'var(--danger)' : '';
-    el.style.color = isError ? 'var(--danger)' : '';
-  }
-
   function requireSocket() {
     if (typeof io === 'undefined') {
-      setServerStatus('Socket.io missing — restart server (npm.cmd start)', true);
       toast('Live features need the Phase 1 server. Stop the old server (Ctrl+C), then start again.', true);
       return false;
     }
     if (!socket?.connected) {
-      setServerStatus('Not connected — refresh or pick a name', true);
       toast('Not connected yet. Wait a moment or refresh the page.', true);
       return false;
     }
@@ -85,7 +75,7 @@
 
   function connectSocket(displayName) {
     if (typeof io === 'undefined') {
-      setServerStatus('Socket.io missing — restart server', true);
+      toast('Socket.io missing — restart server (npm.cmd start)', true);
       return;
     }
 
@@ -97,18 +87,16 @@
 
     socket.on('connect', () => {
       mySocketId = socket.id;
-      setServerStatus('Live · connected', false);
       $('#nav-display-name').textContent = displayName;
       socket.emit('user:setName', { name: displayName });
     });
 
     socket.on('connect_error', (err) => {
-      setServerStatus('Connection failed — restart server', true);
       toast(err.message || 'Could not connect to live server', true);
     });
 
     socket.on('disconnect', () => {
-      setServerStatus('Disconnected — refresh page', true);
+      toast('Disconnected — refresh page', true);
     });
 
     socket.on('room:state', (state) => {
@@ -118,6 +106,7 @@
 
     socket.on('player:sync', (payload) => {
       ITVPlayer.sync(payload);
+      ITVAmbient.sync(payload, () => ITVPlayer.getCurrentTime());
       updateDjBanner(payload);
     });
 
@@ -137,6 +126,56 @@
     }
     if (dj) dj.textContent = player.djName || '—';
     if (title) title.textContent = player.title || '—';
+  }
+
+  function getAirSignMode(state) {
+    if (!mySocketId || !state) return 'listening';
+
+    if (state.nowPlaying?.socketId === mySocketId) return 'on-air';
+
+    const me = (state.users || []).find((u) => u.socketId === mySocketId);
+    if (me?.inQueue) return 'off-air';
+
+    return 'listening';
+  }
+
+  function updateAirSign(state) {
+    const el = $('#air-sign');
+    if (!el) return;
+    const mode = getAirSignMode(state);
+    const labels = {
+      'on-air': 'ON AIR',
+      'off-air': 'OFF AIR',
+      listening: 'Listening',
+    };
+    el.className = `air-sign air-sign--${mode}`;
+    const textEl = el.querySelector('.air-sign__text');
+    if (textEl) textEl.textContent = labels[mode];
+  }
+
+  function getQueueButtonMode(state) {
+    if (!mySocketId || !state) return 'join';
+
+    if (state.nowPlaying?.socketId === mySocketId) return 'skip';
+
+    const me = (state.users || []).find((u) => u.socketId === mySocketId);
+    if (me?.inQueue) return 'leave';
+
+    return 'join';
+  }
+
+  function updateQueueButton(state) {
+    const btn = $('#btn-queue-action');
+    if (!btn) return;
+    const mode = getQueueButtonMode(state);
+    const labels = {
+      join: 'Join Queue',
+      leave: 'Leave Queue',
+      skip: 'Skip Song',
+    };
+    btn.dataset.mode = mode;
+    btn.textContent = labels[mode];
+    btn.title = labels[mode];
   }
 
   function renderRoom(state) {
@@ -177,21 +216,28 @@
       });
     }
 
+    const nowPlayingEl = $('#queue-now-playing');
+    const nowDjEl = $('#queue-now-dj');
+    if (nowPlayingEl && nowDjEl) {
+      if (state.nowPlaying) {
+        nowDjEl.textContent = state.nowPlaying.djName;
+        show(nowPlayingEl, true);
+      } else {
+        show(nowPlayingEl, false);
+      }
+    }
+
     const queueEl = $('#global-queue-list');
     if (queueEl) {
       queueEl.innerHTML = '';
-      if (state.nowPlaying) {
+      const playingId = state.nowPlaying?.socketId;
+      const waiting = (state.globalQueue || []).filter((e) => e.socketId !== playingId);
+      waiting.forEach((e) => {
         const li = document.createElement('li');
-        li.className = 'queue-now';
-        li.textContent = `▶ Now: ${state.nowPlaying.title} — ${state.nowPlaying.djName}`;
-        queueEl.appendChild(li);
-      }
-      (state.globalQueue || []).forEach((e, i) => {
-        const li = document.createElement('li');
-        li.textContent = `${i + 1}. ${e.title} — ${e.djName}`;
+        li.textContent = e.djName;
         queueEl.appendChild(li);
       });
-      if (!state.nowPlaying && (!state.globalQueue || state.globalQueue.length === 0)) {
+      if (!state.nowPlaying && waiting.length === 0) {
         const li = document.createElement('li');
         li.className = 'muted';
         li.textContent = 'Queue is empty';
@@ -213,6 +259,113 @@
         pit.innerHTML = '<p class="panel-placeholder">Waiting for listeners…</p>';
       }
     }
+
+    updateQueueButton(state);
+    updateAirSign(state);
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds || seconds <= 0) return '';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function playlistThumbnail(item) {
+    return item.thumbnail || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
+  }
+
+  function playlistMeta(item) {
+    const parts = [];
+    if (item.channel) parts.push(item.channel);
+    const dur = formatDuration(item.duration);
+    if (dur) parts.push(dur);
+    return parts.join(' • ');
+  }
+
+  function reorderPlaylistIds(dragId, targetId, insertBefore) {
+    const ids = myPlaylist.map((s) => s.id);
+    const from = ids.indexOf(dragId);
+    let to = ids.indexOf(targetId);
+    if (from === -1 || to === -1 || from === to) return null;
+
+    if (insertBefore) {
+      if (from < to) to -= 1;
+    } else if (from > to) {
+      to += 1;
+    }
+
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    return ids;
+  }
+
+  function clearPlaylistDragState(ul) {
+    ul.querySelectorAll('.playlist-item').forEach((el) => {
+      el.classList.remove('is-dragging', 'drag-over-above', 'drag-over-below');
+    });
+  }
+
+  function initPlaylistDragDrop() {
+    const ul = $('#playlist-list');
+    if (!ul || ul.dataset.dndInit) return;
+    ul.dataset.dndInit = '1';
+
+    let dragId = null;
+
+    ul.addEventListener('dragstart', (e) => {
+      const item = e.target.closest('.playlist-item');
+      if (!item || e.target.closest('[data-remove]')) {
+        e.preventDefault();
+        return;
+      }
+      dragId = item.dataset.id;
+      item.classList.add('is-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragId);
+    });
+
+    ul.addEventListener('dragend', () => {
+      dragId = null;
+      clearPlaylistDragState(ul);
+    });
+
+    ul.addEventListener('dragover', (e) => {
+      const item = e.target.closest('.playlist-item');
+      if (!item || !dragId || item.dataset.id === dragId) return;
+
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      ul.querySelectorAll('.playlist-item').forEach((el) => {
+        el.classList.remove('drag-over-above', 'drag-over-below');
+      });
+
+      const rect = item.getBoundingClientRect();
+      const insertBefore = e.clientY < rect.top + rect.height / 2;
+      item.classList.add(insertBefore ? 'drag-over-above' : 'drag-over-below');
+    });
+
+    ul.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const target = e.target.closest('.playlist-item');
+      if (!target || !dragId || target.dataset.id === dragId) {
+        clearPlaylistDragState(ul);
+        return;
+      }
+
+      const rect = target.getBoundingClientRect();
+      const insertBefore = e.clientY < rect.top + rect.height / 2;
+      const orderedIds = reorderPlaylistIds(dragId, target.dataset.id, insertBefore);
+
+      clearPlaylistDragState(ul);
+      dragId = null;
+
+      if (!orderedIds) return;
+      socket.emit('playlist:reorder', { orderedIds }, (res) => {
+        if (res?.error) toast(res.error, true);
+      });
+    });
   }
 
   function renderPlaylist(list) {
@@ -223,17 +376,21 @@
       ul.innerHTML = '<li class="muted">No songs yet — paste a YouTube link above.</li>';
       return;
     }
-    list.forEach((item, index) => {
+    list.forEach((item) => {
       const li = document.createElement('li');
       li.className = 'playlist-item';
       li.dataset.id = item.id;
+      li.draggable = true;
+      li.title = 'Drag to reorder';
+      const meta = playlistMeta(item);
       li.innerHTML = `
-        <span class="pl-order">${index + 1}</span>
-        <span class="pl-title">${escapeHtml(item.title)}</span>
+        <img class="pl-thumb" src="${escapeHtml(playlistThumbnail(item))}" alt="" loading="lazy" draggable="false" />
+        <div class="pl-info">
+          <span class="pl-title">${escapeHtml(item.title)}</span>
+          ${meta ? `<span class="pl-meta">${escapeHtml(meta)}</span>` : ''}
+        </div>
         <span class="pl-actions">
-          <button type="button" class="btn-icon" data-up title="Move up">↑</button>
-          <button type="button" class="btn-icon" data-down title="Move down">↓</button>
-          <button type="button" class="btn-icon" data-remove title="Remove">×</button>
+          <button type="button" class="btn-icon" data-remove title="Remove" draggable="false">×</button>
         </span>
       `;
       li.querySelector('[data-remove]').addEventListener('click', () => {
@@ -241,21 +398,7 @@
           if (res?.error) toast(res.error, true);
         });
       });
-      li.querySelector('[data-up]').addEventListener('click', () => moveItem(index, -1));
-      li.querySelector('[data-down]').addEventListener('click', () => moveItem(index, 1));
       ul.appendChild(li);
-    });
-  }
-
-  function moveItem(index, delta) {
-    const next = index + delta;
-    if (next < 0 || next >= myPlaylist.length) return;
-    const ids = myPlaylist.map((s) => s.id);
-    const t = ids[index];
-    ids[index] = ids[next];
-    ids[next] = t;
-    socket.emit('playlist:reorder', { orderedIds: ids }, (res) => {
-      if (res?.error) toast(res.error, true);
     });
   }
 
@@ -297,22 +440,18 @@
   $('#playlist-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const url = $('#playlist-url').value;
-    const errEl = $('#playlist-error');
-    show(errEl, false);
     const btn = e.target.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
     try {
       const res = await emitAck('playlist:add', { url });
       if (res.error) {
-        errEl.textContent = res.error;
-        show(errEl, true);
+        toast(res.error, true);
       } else {
         $('#playlist-url').value = '';
         toast('Song added');
       }
     } catch (err) {
-      errEl.textContent = err.message;
-      show(errEl, true);
+      toast(err.message, true);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -325,31 +464,18 @@
     });
   });
 
-  $('#btn-join-queue')?.addEventListener('click', () => {
-    socket.emit('queue:join', {}, (res) => {
+  $('#btn-queue-action')?.addEventListener('click', () => {
+    const mode = $('#btn-queue-action')?.dataset.mode || 'join';
+    const actions = {
+      join: { event: 'queue:join', ok: 'Joined the DJ queue' },
+      leave: { event: 'queue:leave', ok: 'Left the queue' },
+      skip: { event: 'queue:skip-current', ok: 'Skipped to next track' },
+    };
+    const action = actions[mode];
+    if (!action) return;
+    socket.emit(action.event, {}, (res) => {
       if (res?.error) toast(res.error, true);
-      else toast('Joined the DJ queue');
-    });
-  });
-
-  $('#btn-leave-queue')?.addEventListener('click', () => {
-    socket.emit('queue:leave', {}, (res) => {
-      if (res?.error) toast(res.error, true);
-      else toast('Left the queue');
-    });
-  });
-
-  $('#btn-skip-current')?.addEventListener('click', () => {
-    socket.emit('queue:skip-current', {}, (res) => {
-      if (res?.error) toast(res.error, true);
-      else toast('Skipped to next track');
-    });
-  });
-
-  $('#btn-skip-mine')?.addEventListener('click', () => {
-    socket.emit('queue:skip-mine', {}, (res) => {
-      if (res?.error) toast(res.error, true);
-      else toast('Removed your song from queue');
+      else toast(action.ok);
     });
   });
 
@@ -375,23 +501,23 @@
     .then((r) => r.json())
     .then((data) => {
       if (!data.ok) {
-        setServerStatus('Server issue', true);
+        toast('Server issue — run npm.cmd start', true);
         return;
       }
       if (data.phase !== 1) {
-        setServerStatus('Wrong server version — restart (Ctrl+C, npm.cmd start)', true);
         toast('Stop the old server with Ctrl+C, then run npm.cmd start again for live chat.', true);
         return;
       }
       if (typeof io === 'undefined') {
-        setServerStatus('Socket.io script missing — restart server', true);
+        toast('Socket.io script missing — restart server', true);
       }
     })
     .catch(() => {
-      setServerStatus('Server offline — run npm.cmd start', true);
+      toast('Server offline — run npm.cmd start', true);
     });
 
   const existing = getDisplayName();
+  initPlaylistDragDrop();
   if (existing.length >= 2) {
     connectSocket(existing);
   } else {
