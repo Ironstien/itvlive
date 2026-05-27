@@ -273,10 +273,12 @@
     const pit = $('#vinyl-pit');
     if (pit) {
       pit.innerHTML = '';
+      const activeDjId = state.nowPlaying?.socketId;
       (state.users || []).forEach((u) => {
         const disc = document.createElement('div');
         disc.className = 'vinyl-user';
-        if (u.inQueue) disc.classList.add('vinyl-user--queued');
+        if (u.socketId === activeDjId) disc.classList.add('vinyl-user--on-air');
+        else if (u.inQueue) disc.classList.add('vinyl-user--queued');
         disc.tabIndex = 0;
         disc.innerHTML = buildVinylRecord(u) + buildVinylTooltip(u);
         pit.appendChild(disc);

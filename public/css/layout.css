@@ -480,8 +480,9 @@ a:hover {
 
 .vinyl-pit .panel-body {
   overflow: visible;
-  padding: 0.45rem 0.85rem;
+  padding: var(--vinyl-pit-inset) 0.85rem;
   align-items: center;
+  box-sizing: border-box;
 }
 
 .vinyl-disc {
