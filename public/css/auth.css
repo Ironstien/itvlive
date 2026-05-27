@@ -1,3 +1,7 @@
+.hidden {
+  display: none !important;
+}
+
 body.page-auth {
   overflow: auto;
 }

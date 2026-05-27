@@ -82,6 +82,23 @@
     }
   });
 
+  // Default tab: login only (register form hidden via .hidden in auth.css)
+  show(loginForm, true);
+  show(registerForm, false);
+
+  fetch('/health')
+    .then((r) => r.json())
+    .then((data) => {
+      if (!data.db) {
+        showError(
+          'Database not connected — save MONGODB_URI in .env, then stop the server (Ctrl+C) and run npm.cmd start again.'
+        );
+      }
+    })
+    .catch(() => {
+      showError('Server offline — run npm.cmd start in the ITVLIVE folder.');
+    });
+
   ITVAuth.fetchMe().then((user) => {
     if (user) {
       window.location.href = '/index.html';
