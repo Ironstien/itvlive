@@ -474,14 +474,18 @@ a:hover {
   grid-column: 1 / -1;
   grid-row: 2;
   min-height: 0;
+  height: var(--vinyl-pit-height);
   max-height: var(--vinyl-pit-height);
-  overflow: visible;
+  overflow: hidden;
 }
 
 .vinyl-pit .panel-body {
-  overflow: visible;
-  padding: var(--vinyl-pit-inset) 0.85rem;
+  display: flex;
   align-items: center;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--vinyl-pit-inset) 0.85rem;
   box-sizing: border-box;
 }
 

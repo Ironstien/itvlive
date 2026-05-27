@@ -273,14 +273,15 @@
     const pit = $('#vinyl-pit');
     if (pit) {
       pit.innerHTML = '';
-      const activeDjId = state.nowPlaying?.socketId;
+      const activeDjId = state.nowPlaying?.socketId || null;
       (state.users || []).forEach((u) => {
+        const isOnAir = activeDjId != null && u.socketId === activeDjId;
         const disc = document.createElement('div');
         disc.className = 'vinyl-user';
-        if (u.socketId === activeDjId) disc.classList.add('vinyl-user--on-air');
+        if (isOnAir) disc.classList.add('vinyl-user--on-air');
         else if (u.inQueue) disc.classList.add('vinyl-user--queued');
         disc.tabIndex = 0;
-        disc.innerHTML = buildVinylRecord(u) + buildVinylTooltip(u);
+        disc.innerHTML = buildVinylRecord(u, isOnAir) + buildVinylTooltip(u);
         pit.appendChild(disc);
       });
       if ((state.users || []).length === 0) {
@@ -460,12 +461,13 @@
     return parts.join(' · ');
   }
 
-  function buildVinylRecord(u) {
+  function buildVinylRecord(u, isOnAir = false) {
+    const spinClass = isOnAir ? ' vinyl-record--spinning' : '';
     const labelContent = u.avatarUrl
       ? `<img class="vinyl-record__avatar" src="${escapeHtml(u.avatarUrl)}" alt="" loading="lazy" />`
       : `<span class="vinyl-record__initial" aria-hidden="true">${escapeHtml((u.displayName || '?').charAt(0).toUpperCase())}</span>`;
     return `
-      <div class="vinyl-record" aria-label="${escapeHtml(u.displayName)}">
+      <div class="vinyl-record${spinClass}" aria-label="${escapeHtml(u.displayName)}">
         <div class="vinyl-record__label">
           ${labelContent}
           <span class="vinyl-record__spindle" aria-hidden="true"></span>

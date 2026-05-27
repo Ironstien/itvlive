@@ -18,13 +18,17 @@
   --side-panel-width: 312px;
   --vinyl-pit-height: 220px;
   --vinyl-pit-header-height: 1.75rem;
-  --vinyl-pit-inset: 0.4rem;
+  --vinyl-pit-inset: 0.45rem;
   --vinyl-pit-row-gap: 0.35rem;
-  --vinyl-disc-size: calc(
-    (
-      var(--vinyl-pit-height) - var(--vinyl-pit-header-height) -
-        (var(--vinyl-pit-inset) * 2) - var(--vinyl-pit-row-gap) - 4px
-    ) / 2
+  --vinyl-disc-max: 66px;
+  --vinyl-disc-size: min(
+    var(--vinyl-disc-max),
+    calc(
+      (
+        var(--vinyl-pit-height) - var(--vinyl-pit-header-height) -
+          (var(--vinyl-pit-inset) * 2) - var(--vinyl-pit-row-gap) - 8px
+      ) / 2
+    )
   );
   --vinyl-label-ratio: 0.42;
   --player-max-width: 420px;
