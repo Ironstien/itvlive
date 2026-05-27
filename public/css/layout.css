@@ -143,6 +143,43 @@ a:hover {
   color: var(--grey-muted);
 }
 
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.btn-test-users {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--void-border);
+  border-radius: var(--radius);
+  background: rgba(20, 18, 28, 0.9);
+  color: var(--grey-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.btn-test-users:hover {
+  color: var(--grey-text);
+  border-color: var(--purple-mid);
+}
+
+.btn-test-users.is-active {
+  background: rgba(90, 24, 154, 0.35);
+  border-color: var(--purple-bright);
+  color: var(--purple-bright);
+  box-shadow: var(--shadow-glow);
+}
+
 /* —— Main stage grid —— */
 .stage {
   flex: 1;

@@ -2,6 +2,7 @@ const { Server } = require('socket.io');
 const { Room } = require('../services/room');
 const { resolveSocketAuth } = require('../services/socketAuth');
 const { saveUserPlaylist } = require('../services/playlistStore');
+const { toggleTestUsers, isTestUsersEnabled } = require('../services/testUsers');
 
 const room = new Room();
 const chatLastSent = new Map();
@@ -194,6 +195,24 @@ function registerSockets(httpServer) {
         syncPlaylistFor(io, result.playlistSyncFor);
         broadcast(io);
         emitPlayerSync(io);
+      }
+    });
+
+    socket.on('dev:testUsers:toggle', (_payload, ack) => {
+      try {
+        const result = toggleTestUsers(room);
+        if (typeof ack === 'function') {
+          ack({ ok: true, enabled: isTestUsersEnabled() });
+        }
+        if (result.playlistSyncFor) {
+          syncPlaylistFor(io, result.playlistSyncFor);
+        }
+        broadcast(io);
+        emitPlayerSync(io);
+      } catch (err) {
+        if (typeof ack === 'function') {
+          ack({ error: err.message || 'Failed to toggle test users' });
+        }
       }
     });
 

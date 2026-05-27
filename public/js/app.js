@@ -178,6 +178,14 @@
     return 'join';
   }
 
+  function updateTestUsersButton(state) {
+    const btn = $('#btn-test-users');
+    if (!btn) return;
+    const on = !!state?.testUsersEnabled;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
   function updateQueueButton(state) {
     const btn = $('#btn-queue-action');
     if (!btn) return;
@@ -280,6 +288,7 @@
 
     updateQueueButton(state);
     updateAirSign(state);
+    updateTestUsersButton(state);
   }
 
   function formatDuration(seconds) {
@@ -555,6 +564,20 @@
     socket.emit(action.event, {}, (res) => {
       if (res?.error) toast(res.error, true);
       else toast(action.ok);
+    });
+  });
+
+  $('#btn-test-users')?.addEventListener('click', () => {
+    if (!requireSocket()) return;
+    const btn = $('#btn-test-users');
+    if (btn) btn.disabled = true;
+    socket.emit('dev:testUsers:toggle', {}, (res) => {
+      if (btn) btn.disabled = false;
+      if (res?.error) {
+        toast(res.error, true);
+        return;
+      }
+      toast(res.enabled ? 'Test users enabled' : 'Test users removed');
     });
   });
 

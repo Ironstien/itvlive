@@ -1,5 +1,6 @@
 const { parseYoutubeId, fetchYoutubeMeta, youtubeThumbnailUrl } = require('./youtube');
 const { can, ACTIONS } = require('../config/permissions');
+const { isTestUsersEnabled } = require('./testUsers');
 
 const MAX_CHAT = 80;
 const MAX_MESSAGE_LEN = 280;
@@ -43,6 +44,25 @@ class Room {
     if (!this.playlists.has(socketId)) {
       this.playlists.set(socketId, []);
     }
+    return this.users.get(socketId);
+  }
+
+  addBotUser(socketId, account = {}, playlistItems = []) {
+    if (this.users.has(socketId)) {
+      this.setPlaylist(socketId, playlistItems);
+      return this.users.get(socketId);
+    }
+
+    this.addUser(socketId, account.displayName, account);
+    const playlist = (playlistItems || []).map((item, index) => ({
+      id: item.id || `${socketId}-${index}`,
+      videoId: item.videoId,
+      title: item.title,
+      thumbnail: item.thumbnail || youtubeThumbnailUrl(item.videoId),
+      channel: item.channel ?? null,
+      duration: item.duration ?? null,
+    }));
+    this.setPlaylist(socketId, playlist);
     return this.users.get(socketId);
   }
 
@@ -410,6 +430,7 @@ class Room {
         inQueue: u.inQueue,
       })),
       chat: [...this.chat],
+      testUsersEnabled: isTestUsersEnabled(),
     };
   }
 }
