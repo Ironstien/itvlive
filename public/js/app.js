@@ -46,6 +46,7 @@
   let mySocketId = null;
   let roomState = null;
   let myPlaylist = [];
+  let loggedInUser = null;
 
   // —— Tabs ——
   document.querySelectorAll('.chat-tab').forEach((tab) => {
@@ -75,7 +76,11 @@
     localStorage.setItem(STORAGE_NAME, name);
   }
 
-  function connectSocket(displayName) {
+  function connectSocket(opts) {
+    const displayName = typeof opts === 'string' ? opts : opts?.displayName;
+    const token = typeof opts === 'object' && opts ? opts.token : null;
+    const profile = typeof opts === 'object' && opts ? opts.profile : null;
+
     if (typeof io === 'undefined') {
       toast('Socket.io missing — restart server (npm.cmd start)', true);
       return;
@@ -83,14 +88,21 @@
 
     if (socket?.connected) socket.disconnect();
 
-    socket = io({
-      auth: { displayName },
-    });
+    loggedInUser = profile || null;
+    const auth = token ? { token } : { displayName };
+    socket = io({ auth });
 
     socket.on('connect', () => {
       mySocketId = socket.id;
-      $('#nav-display-name').textContent = displayName;
-      socket.emit('user:setName', { name: displayName });
+      if (loggedInUser) {
+        ITVAuth.renderNav($('#nav-user'), { user: loggedInUser });
+      } else {
+        ITVAuth.renderNav($('#nav-user'), {
+          guestName: displayName,
+          onChangeName: showNameModal,
+        });
+        socket.emit('user:setName', { name: displayName });
+      }
     });
 
     socket.on('connect_error', (err) => {
@@ -200,7 +212,10 @@
       (state.chat || []).forEach((m) => {
         const div = document.createElement('div');
         div.className = 'chat-msg';
-        div.innerHTML = `<strong>${escapeHtml(m.displayName)}</strong> ${escapeHtml(m.text)}`;
+        const av = m.avatarUrl
+          ? `<img class="chat-avatar" src="${escapeHtml(m.avatarUrl)}" alt="" loading="lazy" />`
+          : '';
+        div.innerHTML = `${av}<span><strong>${escapeHtml(m.displayName)}</strong> ${escapeHtml(m.text)}</span>`;
         chatEl.appendChild(div);
       });
       chatEl.scrollTop = chatEl.scrollHeight;
@@ -254,7 +269,13 @@
         const disc = document.createElement('div');
         disc.className = 'vinyl-user';
         disc.title = u.displayName;
-        disc.innerHTML = `<div class="vinyl-disc-small"></div><span>${escapeHtml(u.displayName)}</span>`;
+        const visual = u.avatarUrl
+          ? `<img class="vinyl-avatar" src="${escapeHtml(u.avatarUrl)}" alt="" loading="lazy" />`
+          : '<div class="vinyl-disc-small"></div>';
+        const saying = u.customSaying
+          ? `<span class="vinyl-saying">${escapeHtml(u.customSaying)}</span>`
+          : '';
+        disc.innerHTML = `${visual}<span>${escapeHtml(u.displayName)}</span>${saying}`;
         pit.appendChild(disc);
       });
       if ((state.users || []).length === 0) {
@@ -430,14 +451,13 @@
     }
     saveDisplayName(trimmed);
     hideNameModal();
-    connectSocket(trimmed);
+    connectSocket({ displayName: trimmed });
   }
 
   $('#name-save')?.addEventListener('click', () => startWithName($('#name-input').value));
   $('#name-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') startWithName($('#name-input').value);
   });
-  $('#btn-change-name')?.addEventListener('click', showNameModal);
 
   $('#playlist-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -559,9 +579,8 @@
         toast('Server issue — run npm.cmd start', true);
         return;
       }
-      if (data.phase !== 1) {
-        toast('Stop the old server with Ctrl+C, then run npm.cmd start again for live chat.', true);
-        return;
+      if (!data.db && data.phase >= 2) {
+        toast('Database not connected — check MONGODB_URI in .env', true);
       }
       if (typeof io === 'undefined') {
         toast('Socket.io script missing — restart server', true);
@@ -571,12 +590,27 @@
       toast('Server offline — run npm.cmd start', true);
     });
 
-  const existing = getDisplayName();
-  initPlaylistDragDrop();
-  initVolumeControl();
-  if (existing.length >= 2) {
-    connectSocket(existing);
-  } else {
-    showNameModal();
+  async function init() {
+    initPlaylistDragDrop();
+    initVolumeControl();
+
+    const user = await ITVAuth.fetchMe();
+    if (user) {
+      connectSocket({ token: ITVAuth.getToken(), profile: user });
+      return;
+    }
+
+    const existing = getDisplayName();
+    ITVAuth.renderNav($('#nav-user'), {
+      guestName: existing || 'Guest',
+      onChangeName: showNameModal,
+    });
+    if (existing.length >= 2) {
+      connectSocket({ displayName: existing });
+    } else {
+      showNameModal();
+    }
   }
+
+  init();
 })();

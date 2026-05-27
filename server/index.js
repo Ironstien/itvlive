@@ -32,7 +32,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     name: 'INTO THE VOID',
-    phase: 0,
+    phase: isDbConnected() ? 2 : 1,
     db: isDbConnected(),
   });
 });
@@ -104,7 +104,7 @@ async function start() {
 
   httpServer.listen(PORT, () => {
     console.log('');
-    console.log('  INTO THE VOID — Phase 0');
+    console.log(`  INTO THE VOID — Phase ${isDbConnected() ? 2 : 1}`);
     console.log(`  Main Stage: http://localhost:${PORT}/index.html`);
     console.log(`  Health:     http://localhost:${PORT}/health`);
     console.log(`  Database:   ${isDbConnected() ? 'connected' : 'skipped (guest mode)'}`);

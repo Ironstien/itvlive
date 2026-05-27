@@ -6,6 +6,7 @@
     <title>INTO THE VOID — Home</title>
     <link rel="stylesheet" href="/css/variables.css" />
     <link rel="stylesheet" href="/css/layout.css" />
+    <link rel="stylesheet" href="/css/auth.css" />
   </head>
   <body>
     <header class="site-nav">
@@ -18,7 +19,7 @@
         <li><a href="/about.html">About Us</a></li>
         <li><a href="/index.html">Main Stage</a></li>
       </ul>
-      <div class="nav-user">Guest</div>
+      <div class="nav-user" id="nav-user">Guest</div>
     </header>
 
     <main class="page-main">
@@ -26,10 +27,18 @@
       <p class="tagline">Drop in, queue a track, and vibe with the room.</p>
       <p>
         A community music room: shared queue, live chat, voting, and the Vinyl Pit.
-        You are on <strong>Phase 1</strong> — live player, chat, playlists, and DJ queue.
+        Live player, chat, playlists, and DJ queue. <a href="/login.html">Log in</a> to save your
+        playlist across sessions.
       </p>
       <a class="cta" href="/index.html">Enter the Main Stage</a>
     </main>
     <script src="/js/version.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+      ITVAuth.fetchMe().then((user) => {
+        if (user) ITVAuth.renderNav(document.getElementById('nav-user'), { user });
+        else ITVAuth.renderNav(document.getElementById('nav-user'), { guestName: 'Guest' });
+      });
+    </script>
   </body>
 </html>

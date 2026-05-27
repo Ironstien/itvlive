@@ -34,6 +34,8 @@ class Room {
       level: account.level ?? 1,
       staffRole,
       emailVerified: account.emailVerified === true,
+      avatarUrl: account.avatarUrl ?? null,
+      customSaying: account.customSaying ?? '',
       role: staffRole === 'admin' ? 'admin' : 'user',
       inQueue: false,
     });
@@ -57,7 +59,19 @@ class Room {
     if (account.username && !account.displayName) {
       user.displayName = String(account.username).slice(0, 24);
     }
+    if (account.avatarUrl !== undefined) user.avatarUrl = account.avatarUrl || null;
+    if (account.customSaying !== undefined) {
+      user.customSaying = String(account.customSaying || '').slice(0, 120);
+    }
     return { ok: true, user };
+  }
+
+  setPlaylist(socketId, items) {
+    this.playlists.set(socketId, Array.isArray(items) ? [...items] : []);
+  }
+
+  getUserId(socketId) {
+    return this.users.get(socketId)?.userId ?? null;
   }
 
   removeUser(socketId) {
@@ -224,6 +238,7 @@ class Room {
     const msg = {
       id: this._chatId,
       displayName: user.displayName,
+      avatarUrl: user.avatarUrl || null,
       text: trimmed,
       at: Date.now(),
     };
@@ -383,6 +398,8 @@ class Room {
         socketId: u.socketId,
         userId: u.userId ?? null,
         displayName: u.displayName,
+        avatarUrl: u.avatarUrl || null,
+        customSaying: u.customSaying || '',
         level: u.level ?? 1,
         inQueue: u.inQueue,
       })),

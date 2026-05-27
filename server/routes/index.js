@@ -1,9 +1,11 @@
+const { authRouter } = require('./auth');
+
 /**
- * REST route registration — auth, shop, and admin routes land in Phase 2+.
- * @param {import('express').Express} _app
+ * REST route registration.
+ * @param {import('express').Express} app
  */
-function registerRoutes(_app) {
-  // Phase 2A: require('./auth') etc.
+function registerRoutes(app) {
+  app.use('/api/auth', authRouter);
 }
 
 module.exports = { registerRoutes };

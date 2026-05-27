@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/variables.css" />
     <link rel="stylesheet" href="/css/layout.css" />
     <link rel="stylesheet" href="/css/components.css" />
+    <link rel="stylesheet" href="/css/auth.css" />
   </head>
   <body>
     <div id="name-modal" class="modal hidden" role="dialog" aria-labelledby="name-modal-title">
@@ -28,10 +29,7 @@
         <li><a href="/about.html">About Us</a></li>
         <li><a href="/index.html" class="active">Main Stage</a></li>
       </ul>
-      <div class="nav-user">
-        <span id="nav-display-name">Connecting…</span>
-        · <button type="button" class="link-btn" id="btn-change-name">Change name</button>
-      </div>
+      <div class="nav-user" id="nav-user">Connecting…</div>
     </header>
 
     <main class="stage">
@@ -156,6 +154,7 @@
     </main>
 
     <script src="/js/version.js"></script>
+    <script src="/js/auth.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="/js/player.js"></script>

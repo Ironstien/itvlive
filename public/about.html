@@ -6,6 +6,7 @@
     <title>INTO THE VOID — About</title>
     <link rel="stylesheet" href="/css/variables.css" />
     <link rel="stylesheet" href="/css/layout.css" />
+    <link rel="stylesheet" href="/css/auth.css" />
   </head>
   <body>
     <header class="site-nav">
@@ -18,7 +19,7 @@
         <li><a href="/about.html" class="active">About Us</a></li>
         <li><a href="/index.html">Main Stage</a></li>
       </ul>
-      <div class="nav-user">Guest</div>
+      <div class="nav-user" id="nav-user">Guest</div>
     </header>
 
     <main class="page-main">
@@ -30,5 +31,12 @@
       <p><a href="/index.html">Back to Main Stage</a></p>
     </main>
     <script src="/js/version.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+      ITVAuth.fetchMe().then((user) => {
+        if (user) ITVAuth.renderNav(document.getElementById('nav-user'), { user });
+        else ITVAuth.renderNav(document.getElementById('nav-user'), { guestName: 'Guest' });
+      });
+    </script>
   </body>
 </html>

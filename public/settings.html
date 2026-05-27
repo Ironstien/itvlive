@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>INTO THE VOID — Settings</title>
+    <link rel="stylesheet" href="/css/variables.css" />
+    <link rel="stylesheet" href="/css/layout.css" />
+    <link rel="stylesheet" href="/css/auth.css" />
+  </head>
+  <body class="page-auth">
+    <header class="site-nav">
+      <div class="site-logo">
+        <span class="site-logo-text">INTO THE VOID</span>
+        <span class="site-version" aria-label="Site version"></span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="/home.html">Home</a></li>
+        <li><a href="/about.html">About Us</a></li>
+        <li><a href="/index.html">Main Stage</a></li>
+      </ul>
+      <div class="nav-user" id="nav-user"></div>
+    </header>
+
+    <main class="page-main auth-main">
+      <div class="auth-card">
+        <h1>Profile</h1>
+        <p id="settings-greeting" class="auth-lead">Loading…</p>
+
+        <p id="settings-error" class="auth-error hidden" role="alert"></p>
+        <p id="settings-ok" class="auth-ok hidden" role="status"></p>
+
+        <form id="form-profile" class="auth-form">
+          <label>
+            Avatar image URL
+            <input
+              type="url"
+              name="avatarUrl"
+              placeholder="https://…"
+              autocomplete="off"
+            />
+          </label>
+          <small class="field-hint">Leave empty to remove. Must be http:// or https://</small>
+
+          <div id="avatar-preview" class="avatar-preview hidden">
+            <img id="avatar-preview-img" alt="Avatar preview" />
+          </div>
+
+          <label>
+            Custom saying
+            <input
+              type="text"
+              name="customSaying"
+              maxlength="120"
+              placeholder="Shown on your profile later"
+            />
+          </label>
+
+          <button type="submit" class="btn-primary">Save changes</button>
+        </form>
+
+        <p class="auth-footer">
+          <a href="/index.html">Back to Main Stage</a>
+          · <a href="#" id="settings-logout">Log out</a>
+        </p>
+      </div>
+    </main>
+
+    <script src="/js/version.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/settings.js"></script>
+  </body>
+</html>
