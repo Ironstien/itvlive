@@ -163,21 +163,3 @@ a.nav-logout {
   border: 1px solid var(--void-border);
 }
 
-.vinyl-user .vinyl-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--purple-mid);
-  animation: spin 10s linear infinite;
-}
-
-.vinyl-user .vinyl-saying {
-  font-size: 0.62rem;
-  color: var(--grey-muted);
-  max-width: 80px;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}

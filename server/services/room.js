@@ -36,6 +36,7 @@ class Room {
       emailVerified: account.emailVerified === true,
       avatarUrl: account.avatarUrl ?? null,
       customSaying: account.customSaying ?? '',
+      badges: Array.isArray(account.badges) ? [...account.badges] : [],
       role: staffRole === 'admin' ? 'admin' : 'user',
       inQueue: false,
     });
@@ -62,6 +63,9 @@ class Room {
     if (account.avatarUrl !== undefined) user.avatarUrl = account.avatarUrl || null;
     if (account.customSaying !== undefined) {
       user.customSaying = String(account.customSaying || '').slice(0, 120);
+    }
+    if (account.badges !== undefined) {
+      user.badges = Array.isArray(account.badges) ? [...account.badges] : [];
     }
     return { ok: true, user };
   }
@@ -401,6 +405,8 @@ class Room {
         avatarUrl: u.avatarUrl || null,
         customSaying: u.customSaying || '',
         level: u.level ?? 1,
+        staffRole: u.staffRole ?? null,
+        badges: Array.isArray(u.badges) ? u.badges : [],
         inQueue: u.inQueue,
       })),
       chat: [...this.chat],

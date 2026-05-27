@@ -55,6 +55,7 @@ async function resolveSocketAuth(handshakeAuth = {}) {
       emailVerified: user.emailVerified === true,
       avatarUrl: user.avatarUrl || null,
       customSaying: user.customSaying || '',
+      badges: user.badges || [],
     },
     playlist,
   };

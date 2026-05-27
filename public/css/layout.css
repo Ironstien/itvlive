@@ -438,17 +438,13 @@ a:hover {
   grid-row: 2;
   min-height: 0;
   max-height: var(--vinyl-pit-height);
+  overflow: visible;
 }
 
 .vinyl-pit .panel-body {
-  display: flex;
+  overflow: visible;
+  padding: 0.45rem 0.85rem;
   align-items: center;
-  justify-content: flex-start;
-  gap: 1rem;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0.65rem 0.85rem;
 }
 
 .vinyl-disc {

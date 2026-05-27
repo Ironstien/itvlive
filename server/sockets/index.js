@@ -50,6 +50,7 @@ function parseSocketAccount(auth = {}) {
   if (auth.username) account.username = auth.username;
   if (auth.avatarUrl !== undefined) account.avatarUrl = auth.avatarUrl || null;
   if (auth.customSaying !== undefined) account.customSaying = auth.customSaying;
+  if (auth.badges !== undefined) account.badges = auth.badges;
   return account;
 }
 

@@ -268,14 +268,9 @@
       (state.users || []).forEach((u) => {
         const disc = document.createElement('div');
         disc.className = 'vinyl-user';
-        disc.title = u.displayName;
-        const visual = u.avatarUrl
-          ? `<img class="vinyl-avatar" src="${escapeHtml(u.avatarUrl)}" alt="" loading="lazy" />`
-          : '<div class="vinyl-disc-small"></div>';
-        const saying = u.customSaying
-          ? `<span class="vinyl-saying">${escapeHtml(u.customSaying)}</span>`
-          : '';
-        disc.innerHTML = `${visual}<span>${escapeHtml(u.displayName)}</span>${saying}`;
+        if (u.inQueue) disc.classList.add('vinyl-user--queued');
+        disc.tabIndex = 0;
+        disc.innerHTML = buildVinylRecord(u) + buildVinylTooltip(u);
         pit.appendChild(disc);
       });
       if ((state.users || []).length === 0) {
@@ -423,6 +418,68 @@
       });
       ul.appendChild(li);
     });
+  }
+
+  const VINYL_LEVEL_NAMES = {
+    1: 'Newcomer',
+    2: 'Member',
+    3: 'Regular',
+    4: 'Veteran',
+    5: 'Elite',
+  };
+
+  const STAFF_ROLE_LABELS = {
+    resident: 'Resident DJ',
+    host: 'Host',
+    mod: 'Moderator',
+    admin: 'Admin',
+  };
+
+  function vinylLevelName(level) {
+    const n = Math.min(5, Math.max(1, Math.floor(Number(level) || 1)));
+    return VINYL_LEVEL_NAMES[n] || VINYL_LEVEL_NAMES[1];
+  }
+
+  function buildVinylRankLine(u) {
+    const level = u.level ?? 1;
+    const parts = [`Level ${level}`, vinylLevelName(level)];
+    if (u.staffRole && STAFF_ROLE_LABELS[u.staffRole]) {
+      parts.push(STAFF_ROLE_LABELS[u.staffRole]);
+    }
+    return parts.join(' · ');
+  }
+
+  function buildVinylRecord(u) {
+    const labelContent = u.avatarUrl
+      ? `<img class="vinyl-record__avatar" src="${escapeHtml(u.avatarUrl)}" alt="" loading="lazy" />`
+      : `<span class="vinyl-record__initial" aria-hidden="true">${escapeHtml((u.displayName || '?').charAt(0).toUpperCase())}</span>`;
+    return `
+      <div class="vinyl-record" aria-label="${escapeHtml(u.displayName)}">
+        <div class="vinyl-record__label">
+          ${labelContent}
+          <span class="vinyl-record__spindle" aria-hidden="true"></span>
+        </div>
+      </div>
+    `;
+  }
+
+  function buildVinylTooltip(u) {
+    const saying = u.customSaying
+      ? `<p class="vinyl-tooltip__saying">${escapeHtml(u.customSaying)}</p>`
+      : '';
+    const badges = (u.badges || []).length
+      ? `<p class="vinyl-tooltip__badges">${(u.badges || []).map((b) => escapeHtml(b)).join(' · ')}</p>`
+      : '';
+    const queueHint = u.inQueue ? '<p class="vinyl-tooltip__queue">In DJ queue</p>' : '';
+    return `
+      <div class="vinyl-tooltip" role="tooltip">
+        <p class="vinyl-tooltip__name">${escapeHtml(u.displayName)}</p>
+        <p class="vinyl-tooltip__rank">${escapeHtml(buildVinylRankLine(u))}</p>
+        ${saying}
+        ${badges}
+        ${queueHint}
+      </div>
+    `;
   }
 
   function escapeHtml(str) {

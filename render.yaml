@@ -11,8 +11,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # Optional until Phase 2 — leave unset for in-memory room state only
+      # Required for login/register (Phase 2A) — set value in Render Dashboard, not in git
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: CLIENT_ORIGIN
+        sync: false

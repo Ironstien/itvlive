@@ -17,6 +17,9 @@
   --shadow-glow: 0 0 24px rgba(155, 93, 229, 0.25);
   --side-panel-width: 312px;
   --vinyl-pit-height: 220px;
+  --vinyl-disc-size: 96px;
+  --vinyl-label-ratio: 0.42;
+  --vinyl-pit-row-gap: 0.4rem;
   --player-max-width: 420px;
   --player-max-height: 236px;
   --void-bg-base: #030304;

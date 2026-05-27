@@ -90,8 +90,12 @@
     .then((r) => r.json())
     .then((data) => {
       if (!data.db) {
+        const local =
+          location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         showError(
-          'Database not connected — save MONGODB_URI in .env, then stop the server (Ctrl+C) and run npm.cmd start again.'
+          local
+            ? 'Database not connected — save MONGODB_URI in .env, then stop the server (Ctrl+C) and run npm.cmd start again.'
+            : 'Database not connected on the live server. In Render: open your Web Service → Environment → add MONGODB_URI (same Atlas string as local .env) and JWT_SECRET, then Manual Deploy. In Atlas: Network Access must allow 0.0.0.0/0 (or Render IPs).'
         );
       }
     })

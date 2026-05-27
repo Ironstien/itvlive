@@ -466,26 +466,204 @@
 }
 
 .vinyl-pit-body {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  justify-content: center;
+  display: grid;
+  grid-template-rows: repeat(2, var(--vinyl-disc-size));
+  grid-auto-flow: column;
+  grid-auto-columns: var(--vinyl-disc-size);
+  gap: var(--vinyl-pit-row-gap) 0.65rem;
+  align-content: center;
+  justify-content: flex-start;
+  min-height: calc(var(--vinyl-disc-size) * 2 + var(--vinyl-pit-row-gap));
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-top: 0.15rem;
+}
+
+.vinyl-pit-body .panel-placeholder {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  align-self: center;
+  justify-self: center;
 }
 
 .vinyl-user {
+  position: relative;
+  width: var(--vinyl-disc-size);
+  height: var(--vinyl-disc-size);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  font-size: 0.7rem;
-  color: var(--grey-muted);
+  justify-content: center;
+  outline: none;
 }
 
-.vinyl-disc-small {
-  width: 52px;
-  height: 52px;
+.vinyl-user--queued .vinyl-record {
+  box-shadow:
+    0 0 0 2px var(--purple-bright),
+    inset 0 0 10px rgba(0, 0, 0, 0.85),
+    0 3px 8px rgba(0, 0, 0, 0.45);
+}
+
+.vinyl-record {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #333, #111);
-  border: 2px solid var(--purple-mid);
-  animation: spin 10s linear infinite;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.12), transparent 42%),
+    repeating-radial-gradient(
+      circle at center,
+      #181818 0 1px,
+      #0a0a0a 1px 2px,
+      #121212 2px 3px,
+      #080808 3px 4px
+    );
+  box-shadow:
+    inset 0 0 12px rgba(0, 0, 0, 0.85),
+    0 3px 8px rgba(0, 0, 0, 0.45);
+  animation: spin 14s linear infinite;
+}
+
+.vinyl-record__label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--vinyl-disc-size) * var(--vinyl-label-ratio));
+  height: calc(var(--vinyl-disc-size) * var(--vinyl-label-ratio));
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(145deg, #ece8df, #c8c2b8);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.vinyl-record__avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vinyl-record__initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: calc(var(--vinyl-disc-size) * 0.18);
+  font-weight: 700;
+  color: var(--purple-mid);
+  text-transform: uppercase;
+}
+
+.vinyl-record__spindle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--vinyl-disc-size) * var(--vinyl-label-ratio) * 0.12);
+  height: calc(var(--vinyl-disc-size) * var(--vinyl-label-ratio) * 0.12);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--void-black);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
+  z-index: 1;
+}
+
+.vinyl-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.45rem);
+  transform: translateX(-50%) translateY(4px);
+  min-width: 9rem;
+  max-width: 14rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--void-border);
+  background: rgba(14, 12, 20, 0.96);
+  box-shadow: var(--shadow-glow);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--grey-text);
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    visibility 0.15s ease;
+  z-index: 20;
+}
+
+.vinyl-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(14, 12, 20, 0.96);
+}
+
+.vinyl-tooltip p {
+  margin: 0;
+}
+
+.vinyl-tooltip p + p {
+  margin-top: 0.2rem;
+}
+
+.vinyl-tooltip__name {
+  color: var(--purple-bright);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.vinyl-tooltip__rank {
+  color: var(--grey-muted);
+  font-size: 0.68rem;
+}
+
+.vinyl-tooltip__saying {
+  color: var(--grey-text);
+  font-style: italic;
+}
+
+.vinyl-tooltip__badges {
+  color: var(--flame);
+  font-size: 0.68rem;
+}
+
+.vinyl-tooltip__queue {
+  color: var(--success);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.vinyl-user:hover .vinyl-tooltip,
+.vinyl-user:focus-visible .vinyl-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.vinyl-user:focus-visible .vinyl-record {
+  box-shadow:
+    0 0 0 2px var(--purple-bright),
+    inset 0 0 12px rgba(0, 0, 0, 0.85),
+    0 3px 8px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 900px) {
+  :root {
+    --vinyl-disc-size: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vinyl-record {
+    animation: none;
+  }
 }
