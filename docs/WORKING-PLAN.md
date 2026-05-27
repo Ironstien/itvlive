@@ -18,17 +18,17 @@
 Fill these in so prompts and implementation stay aligned.
 
 
-| Decision                        | Your choice                                   | Default in this plan                                    |
-| ------------------------------- | --------------------------------------------- | ------------------------------------------------------- |
-| Guest access after login exists | ☐ Allow guests ☐ Login required on Main Stage | Allow guests on Main Stage                              |
-| Email verification for Level 2  | ☐ Required ☐ Optional                         | Required (flag on user)                                 |
-| Level 3 “shape queue” means     | *describe here*                               | Reorder own playlist + join queue (no extra powers yet) |
-| Vote submit UX                  | ☐ On slider release ☐ Live as you drag        | On slider release                                       |
-| Token: full listen rule         | Connected ≥ __% of song duration              | 90%                                                     |
-| Token: DJ reward                | +__ tokens when your song finishes            | +3                                                      |
-| Token: listener reward          | +__ tokens for full listen                    | +1                                                      |
-| Avatar storage                  | ☐ URL only ☐ File upload to server/cloud      | URL only (Phase 2A)                                     |
-| Deploy target                   | Render + MongoDB Atlas                        | Yes                                                     |
+| Decision                        | Your choice
+| ------------------------------- | ---------------------------------------------
+| Guest access after login exists | Allow guests on Main Stage but they can only listen
+| Email verification for Level 2  | Email verification never needed. Email is only used to create an account
+| Level 3 “shape queue” means     | All users that can create a playlist can reorder their playlist
+| Vote submit UX                  | Voting slider can be moved during the song but the vote value is recorded when the song finishes
+| Token: full listen rule         | No full listen rule, only consider if they are present for the song ending and they gain +1 token
+| Token: DJ reward                | +3 tokens when your song finishes
+| Token: listener reward          | +1 token for listen (being present at the end of the song)
+| Avatar storage                  | File upload or URL
+| Deploy target                   | Render + MongoDB Atlas
 
 
 ---
@@ -40,7 +40,7 @@ Fill these in so prompts and implementation stay aligned.
 
 | Field       | Values                                     | Purpose                  |
 | ----------- | ------------------------------------------ | ------------------------ |
-| `level`     | `1`–`5`                                    | Earned: Newcomer → Elite |
+| `level`     | `1`,`2`,`3`,`4`,`5`                        | Earned: Newcomer → Elite |
 | `staffRole` | `null`, `resident`, `host`, `mod`, `admin` | Assigned permissions     |
 
 
@@ -94,7 +94,7 @@ Fill these in so prompts and implementation stay aligned.
 | Level | Name     | Unlock when                                       |
 | ----- | -------- | ------------------------------------------------- |
 | 1     | Newcomer | Account created                                   |
-| 2     | Member   | Email verified + **5** votes cast                 |
+| 2     | Member   | **5** votes cast             		       |
 | 3     | Regular  | **30** days + **50** votes + **20** chat messages |
 | 4     | Veteran  | **90** days + **200** listens + **10** DJ plays   |
 | 5     | Elite    | Manual / token shop / top tier — *your rule:*     |

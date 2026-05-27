@@ -24,9 +24,26 @@ function emitPlayerSync(io) {
   io.emit('player:sync', room.getPlayerSync());
 }
 
+function handleTrackEnded(io, playlistSyncFor) {
+  syncPlaylistFor(io, playlistSyncFor);
+  broadcast(io);
+  emitPlayerSync(io);
+}
+
 /** Room updates (chat, online users, queue) — does not touch the YouTube player */
 function broadcastRoom(io) {
   io.emit('room:state', room.getRoomState());
+}
+
+function parseSocketAccount(auth = {}) {
+  if (!auth || typeof auth !== 'object') return {};
+  const account = {};
+  if (auth.userId) account.userId = String(auth.userId);
+  if (auth.level != null) account.level = Number(auth.level);
+  if (auth.staffRole) account.staffRole = auth.staffRole;
+  if (auth.emailVerified != null) account.emailVerified = auth.emailVerified === true;
+  if (auth.username) account.username = auth.username;
+  return account;
 }
 
 function registerSockets(httpServer) {
@@ -37,9 +54,16 @@ function registerSockets(httpServer) {
     },
   });
 
+  room.setTrackEndHandler((playlistSyncFor) => {
+    handleTrackEnded(io, playlistSyncFor);
+  });
+
   io.on('connection', (socket) => {
-    const storedName = socket.handshake.auth?.displayName;
-    room.addUser(socket.id, storedName);
+    const auth = socket.handshake.auth || {};
+    const storedName = auth.displayName || auth.username;
+    const account = parseSocketAccount(auth);
+
+    room.addUser(socket.id, storedName, account);
 
     socket.emit('playlist:sync', room.getPlaylist(socket.id));
     socket.emit('room:state', room.getRoomState());
@@ -48,6 +72,12 @@ function registerSockets(httpServer) {
 
     socket.on('user:setName', ({ name }, ack) => {
       const result = room.setDisplayName(socket.id, name);
+      if (typeof ack === 'function') ack(result);
+      if (result.ok) broadcast(io);
+    });
+
+    socket.on('user:attachAccount', (payload, ack) => {
+      const result = room.attachUserAccount(socket.id, parseSocketAccount(payload));
       if (typeof ack === 'function') ack(result);
       if (result.ok) broadcast(io);
     });
@@ -137,9 +167,8 @@ function registerSockets(httpServer) {
     socket.on('player:ended', () => {
       if (!room.nowPlaying) return;
       const playlistSyncFor = room.onTrackEnded();
-      syncPlaylistFor(io, playlistSyncFor);
-      broadcast(io);
-      emitPlayerSync(io);
+      if (playlistSyncFor === null) return;
+      handleTrackEnded(io, playlistSyncFor);
     });
 
     socket.on('disconnect', () => {

@@ -4,9 +4,12 @@ const http = require('http');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const { connectDB } = require('./config/db');
+const { connectDB, isDbConnected } = require('./config/db');
+const { registerRoutes } = require('./routes');
 const { registerSockets } = require('./sockets');
 const { parseYoutubeId, fetchStoryboard, youtubeThumbnailUrl } = require('./services/youtube');
+
+require('./models');
 
 const YTIMG_HOST_RE = /^https:\/\/i\.ytimg\.com\//;
 
@@ -26,7 +29,12 @@ app.use(
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, name: 'INTO THE VOID', phase: 1 });
+  res.json({
+    ok: true,
+    name: 'INTO THE VOID',
+    phase: 0,
+    db: isDbConnected(),
+  });
 });
 
 app.get('/api/youtube/:videoId/storyboard', async (req, res) => {
@@ -79,6 +87,8 @@ app.get('/api/youtube/proxy-image', async (req, res) => {
   }
 });
 
+registerRoutes(app);
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const httpServer = http.createServer(app);
@@ -94,9 +104,10 @@ async function start() {
 
   httpServer.listen(PORT, () => {
     console.log('');
-    console.log('  INTO THE VOID — Phase 1');
+    console.log('  INTO THE VOID — Phase 0');
     console.log(`  Main Stage: http://localhost:${PORT}/index.html`);
     console.log(`  Health:     http://localhost:${PORT}/health`);
+    console.log(`  Database:   ${isDbConnected() ? 'connected' : 'skipped (guest mode)'}`);
     console.log('');
     console.log('  Tip: open two browser tabs to test chat and queue.');
     console.log('');

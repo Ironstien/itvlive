@@ -1,7 +1,10 @@
 const { parseYoutubeId, fetchYoutubeMeta, youtubeThumbnailUrl } = require('./youtube');
+const { can, ACTIONS } = require('../config/permissions');
 
 const MAX_CHAT = 80;
 const MAX_MESSAGE_LEN = 280;
+/** When YouTube duration is unknown, server timer uses this fallback (seconds). */
+const DEFAULT_TRACK_DURATION_SEC = 600;
 
 class Room {
   constructor() {
@@ -13,20 +16,48 @@ class Room {
     this._queueId = 0;
     this._chatId = 0;
     this._lastFinishedAt = null;
+    this._trackEndTimer = null;
+    this._onTrackEnd = null;
   }
 
-  addUser(socketId, displayName) {
+  setTrackEndHandler(fn) {
+    this._onTrackEnd = typeof fn === 'function' ? fn : null;
+  }
+
+  addUser(socketId, displayName, account = {}) {
     const odName = (displayName || `Guest-${socketId.slice(0, 4)}`).slice(0, 24);
+    const staffRole = account.staffRole ?? null;
     this.users.set(socketId, {
       socketId,
+      userId: account.userId ?? null,
       displayName: odName,
-      role: 'user',
+      level: account.level ?? 1,
+      staffRole,
+      emailVerified: account.emailVerified === true,
+      role: staffRole === 'admin' ? 'admin' : 'user',
       inQueue: false,
     });
     if (!this.playlists.has(socketId)) {
       this.playlists.set(socketId, []);
     }
     return this.users.get(socketId);
+  }
+
+  attachUserAccount(socketId, account = {}) {
+    const user = this.users.get(socketId);
+    if (!user) return { error: 'Not connected' };
+    if (account.userId != null) user.userId = account.userId;
+    if (account.level != null) user.level = account.level;
+    if (account.staffRole !== undefined) {
+      user.staffRole = account.staffRole;
+      user.role = account.staffRole === 'admin' ? 'admin' : 'user';
+    }
+    if (account.emailVerified !== undefined) user.emailVerified = account.emailVerified === true;
+    if (account.displayName) user.displayName = String(account.displayName).slice(0, 24);
+    if (account.username && !account.displayName) {
+      user.displayName = String(account.username).slice(0, 24);
+    }
+    return { ok: true, user };
   }
 
   removeUser(socketId) {
@@ -113,7 +144,7 @@ class Room {
       title: this.nowPlaying.title,
       thumbnail: youtubeThumbnailUrl(this.nowPlaying.videoId),
       channel: null,
-      duration: null,
+      duration: this.nowPlaying.durationSec ?? null,
     };
     pl.push(item);
     this.playlists.set(socketId, pl);
@@ -171,10 +202,12 @@ class Room {
 
   skipCurrent(socketId) {
     if (!this.nowPlaying) return { error: 'Nothing is playing' };
-    const isOwner = this.nowPlaying.socketId === socketId;
     const user = this.users.get(socketId);
-    const isAdmin = user?.role === 'admin';
-    if (!isOwner && !isAdmin) {
+    const isCurrentDj = this.nowPlaying.socketId === socketId;
+    const allowed =
+      can(user, ACTIONS.SKIP_OWN_NOW_PLAYING, { isCurrentDj }) ||
+      can(user, ACTIONS.SKIP_ANY_NOW_PLAYING);
+    if (!allowed) {
       return { error: 'Only the current DJ can skip this song' };
     }
     const playlistSyncFor = this._finishCurrentTrack(this.nowPlaying.socketId);
@@ -207,6 +240,37 @@ class Room {
     return this._finishCurrentTrack(this.nowPlaying.socketId);
   }
 
+  _clearTrackEndTimer() {
+    if (this._trackEndTimer) {
+      clearTimeout(this._trackEndTimer);
+      this._trackEndTimer = null;
+    }
+  }
+
+  _resolveDurationSec(rawDuration) {
+    const n = Number(rawDuration);
+    if (Number.isFinite(n) && n > 0) return Math.floor(n);
+    return DEFAULT_TRACK_DURATION_SEC;
+  }
+
+  _scheduleTrackEndTimer() {
+    this._clearTrackEndTimer();
+    if (!this.nowPlaying) return;
+
+    const durationSec = this._resolveDurationSec(this.nowPlaying.durationSec);
+    const endAt = this.nowPlaying.startedAt + durationSec * 1000;
+    const delay = Math.max(1000, endAt - Date.now());
+
+    this._trackEndTimer = setTimeout(() => {
+      this._trackEndTimer = null;
+      if (!this.nowPlaying) return;
+      const playlistSyncFor = this.onTrackEnded();
+      if (playlistSyncFor !== null && this._onTrackEnd) {
+        this._onTrackEnd(playlistSyncFor);
+      }
+    }, delay);
+  }
+
   _consumePlaylistHead(socketId) {
     const pl = this.playlists.get(socketId) || [];
     if (pl.length === 0) return null;
@@ -229,6 +293,7 @@ class Room {
   }
 
   _finishCurrentTrack(finishedSocketId = null) {
+    this._clearTrackEndTimer();
     this.nowPlaying = null;
     if (
       finishedSocketId &&
@@ -237,7 +302,8 @@ class Room {
     ) {
       this._moveQueueUserToBottom(finishedSocketId);
     }
-    return this._tryStartNext();
+    const playlistSyncFor = this._tryStartNext();
+    return playlistSyncFor;
   }
 
   _tryStartNext() {
@@ -260,16 +326,21 @@ class Room {
         continue;
       }
 
+      const durationSec = this._resolveDurationSec(head.duration);
+
       this.nowPlaying = {
         queueEntryId: next.id,
         socketId: next.socketId,
+        userId: user.userId ?? null,
         djName: user.displayName,
         videoId: head.videoId,
         title: head.title,
+        durationSec,
         startedAt: Date.now(),
       };
 
       this._moveQueueUserToBottom(next.socketId);
+      this._scheduleTrackEndTimer();
       return next.socketId;
     }
 
@@ -285,6 +356,7 @@ class Room {
       title: this.nowPlaying.title,
       djName: this.nowPlaying.djName,
       startedAt: this.nowPlaying.startedAt,
+      durationSec: this.nowPlaying.durationSec,
       isPlaying: true,
     };
   }
@@ -294,10 +366,12 @@ class Room {
       nowPlaying: this.nowPlaying
         ? {
             socketId: this.nowPlaying.socketId,
+            userId: this.nowPlaying.userId ?? null,
             djName: this.nowPlaying.djName,
             title: this.nowPlaying.title,
             videoId: this.nowPlaying.videoId,
             startedAt: this.nowPlaying.startedAt,
+            durationSec: this.nowPlaying.durationSec,
           }
         : null,
       globalQueue: this.globalQueue.map((e) => ({
@@ -307,7 +381,9 @@ class Room {
       })),
       users: [...this.users.values()].map((u) => ({
         socketId: u.socketId,
+        userId: u.userId ?? null,
         displayName: u.displayName,
+        level: u.level ?? 1,
         inQueue: u.inQueue,
       })),
       chat: [...this.chat],
@@ -315,4 +391,4 @@ class Room {
   }
 }
 
-module.exports = { Room };
+module.exports = { Room, DEFAULT_TRACK_DURATION_SEC };
