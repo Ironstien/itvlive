@@ -18,17 +18,17 @@
 Fill these in so prompts and implementation stay aligned.
 
 
-| Decision                        | Your choice
-| ------------------------------- | ---------------------------------------------
-| Guest access after login exists | Allow guests on Main Stage but they can only listen
-| Email verification for Level 2  | Email verification never needed. Email is only used to create an account
-| Level 3 “shape queue” means     | All users that can create a playlist can reorder their playlist
-| Vote submit UX                  | Voting slider can be moved during the song but the vote value is recorded when the song finishes
-| Token: full listen rule         | No full listen rule, only consider if they are present for the song ending and they gain +1 token
-| Token: DJ reward                | +3 tokens when your song finishes
-| Token: listener reward          | +1 token for listen (being present at the end of the song)
-| Avatar storage                  | File upload or URL
-| Deploy target                   | Render + MongoDB Atlas
+| Decision                        | Your choice                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Guest access after login exists | Allow guests on Main Stage                                                                        |
+| Email verification for Level 2  | Email verification never needed. Email is only used to create an account                          |
+| Level 3 “shape queue” means     | All users that can create a playlist can reorder their playlist                                   |
+| Vote submit UX                  | Voting slider can be moved during the song but the vote value is recorded when the song finishes  |
+| Token: full listen rule         | No full listen rule, only consider if they are present for the song ending and they gain +1 token |
+| Token: DJ reward                | +3 tokens when your song finishes                                                                 |
+| Token: listener reward          | +1 token for listen (being present at the end of the song)                                        |
+| Avatar storage                  | URL Only                                                                                          |
+| Deploy target                   | Render + MongoDB Atlas                                                                            |
 
 
 ---
@@ -94,7 +94,7 @@ Fill these in so prompts and implementation stay aligned.
 | Level | Name     | Unlock when                                       |
 | ----- | -------- | ------------------------------------------------- |
 | 1     | Newcomer | Account created                                   |
-| 2     | Member   | **5** votes cast             		       |
+| 2     | Member   | **5** votes cast                                  |
 | 3     | Regular  | **30** days + **50** votes + **20** chat messages |
 | 4     | Veteran  | **90** days + **200** listens + **10** DJ plays   |
 | 5     | Elite    | Manual / token shop / top tier — *your rule:*     |
@@ -182,7 +182,7 @@ After changes, tell me how to test locally.
 #### Frontend
 
 - `public/login.html` — login + register forms
-- Store JWT in `localStorage` (or httpOnly cookie — *your choice:*)
+- Store JWT in `localStorage`
 - Pass token in socket `auth: { token }`
 - Nav: show username + avatar; link to settings
 - `public/settings.html` — edit avatar URL, custom saying
