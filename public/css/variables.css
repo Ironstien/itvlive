@@ -36,8 +36,10 @@
   );
   --vinyl-label-ratio: 0.42;
   --player-flank-gap: 0.5rem;
+  --player-stage-gap-min: 0.65rem;
+  --player-video-width: 420px;
+  --player-video-height: calc(var(--player-video-width) * 9 / 16);
   --current-dj-disc-min: 88px;
-  --current-dj-disc-max: var(--player-max-height);
   --current-dj-stats-min-width: 118px;
   --player-max-width: 420px;
   --player-max-height: 236px;
