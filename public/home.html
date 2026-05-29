@@ -2,49 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0; url=/index.html?overlay=home" />
     <title>INTO THE VOID — Home</title>
-    <link rel="stylesheet" href="/css/variables.css" />
-    <link rel="stylesheet" href="/css/layout.css" />
-    <link rel="stylesheet" href="/css/auth.css" />
+    <script>window.location.replace('/index.html?overlay=home');</script>
   </head>
   <body>
-    <header class="site-nav">
-      <div class="site-logo">
-        <img
-          src="/img/itv-logo.png"
-          alt="Into The Void Live"
-          class="site-logo-img"
-          width="852"
-          height="151"
-          decoding="async"
-        />
-      </div>
-      <ul class="nav-links">
-        <li><a href="/home.html" class="active">Home</a></li>
-        <li><a href="/about.html">About Us</a></li>
-        <li><a href="/index.html">Main Stage</a></li>
-      </ul>
-      <div class="nav-user" id="nav-user">Guest</div>
-    </header>
-
-    <main class="page-main">
-      <h1>Welcome to the void</h1>
-      <p class="tagline">Drop in, queue a track, and vibe with the room.</p>
-      <p>
-        A community music room: shared queue, live chat, voting, and the Vinyl Pit.
-        Live player, chat, playlists, and DJ queue. <a href="/login.html">Log in</a> to save your
-        playlist across sessions.
-      </p>
-      <a class="cta" href="/index.html">Enter the Main Stage</a>
-    </main>
-    <script src="/js/version.js"></script>
-    <script src="/js/auth.js"></script>
-    <script>
-      ITVAuth.fetchMe().then((user) => {
-        if (user) ITVAuth.renderNav(document.getElementById('nav-user'), { user });
-        else ITVAuth.renderNav(document.getElementById('nav-user'), { guestName: 'Guest' });
-      });
-    </script>
+    <p><a href="/index.html?overlay=home">Continue to Main Stage…</a></p>
   </body>
 </html>

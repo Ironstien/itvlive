@@ -2,47 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0; url=/index.html?overlay=about" />
     <title>INTO THE VOID — About</title>
-    <link rel="stylesheet" href="/css/variables.css" />
-    <link rel="stylesheet" href="/css/layout.css" />
-    <link rel="stylesheet" href="/css/auth.css" />
+    <script>window.location.replace('/index.html?overlay=about');</script>
   </head>
   <body>
-    <header class="site-nav">
-      <div class="site-logo">
-        <img
-          src="/img/itv-logo.png"
-          alt="Into The Void Live"
-          class="site-logo-img"
-          width="852"
-          height="151"
-          decoding="async"
-        />
-      </div>
-      <ul class="nav-links">
-        <li><a href="/home.html">Home</a></li>
-        <li><a href="/about.html" class="active">About Us</a></li>
-        <li><a href="/index.html">Main Stage</a></li>
-      </ul>
-      <div class="nav-user" id="nav-user">Guest</div>
-    </header>
-
-    <main class="page-main">
-      <h1>About ITV</h1>
-      <p>
-        INTO THE VOID is a community platform for queuing music, chatting in real time,
-        rating tracks, and earning tokens for cosmetics and ranks.
-      </p>
-      <p><a href="/index.html">Back to Main Stage</a></p>
-    </main>
-    <script src="/js/version.js"></script>
-    <script src="/js/auth.js"></script>
-    <script>
-      ITVAuth.fetchMe().then((user) => {
-        if (user) ITVAuth.renderNav(document.getElementById('nav-user'), { user });
-        else ITVAuth.renderNav(document.getElementById('nav-user'), { guestName: 'Guest' });
-      });
-    </script>
+    <p><a href="/index.html?overlay=about">Continue to Main Stage…</a></p>
   </body>
 </html>

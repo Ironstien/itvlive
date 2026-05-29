@@ -19,6 +19,82 @@
       </div>
     </div>
 
+    <div id="site-overlay" class="site-overlay hidden" aria-hidden="true">
+      <button type="button" class="site-overlay__backdrop" aria-label="Close" data-overlay-close></button>
+      <div class="site-overlay__dialog">
+        <div id="overlay-home" class="overlay-panel auth-card hidden" role="dialog" aria-labelledby="overlay-home-title">
+          <h1 id="overlay-home-title">Welcome to the void</h1>
+          <p class="tagline">Drop in, queue a track, and vibe with the room.</p>
+          <p>
+            A community music room: shared queue, live chat, voting, and the Vinyl Pit.
+            Live player, chat, playlists, and DJ queue.
+            <a href="/login.html">Log in</a> to save your playlist across sessions.
+          </p>
+          <button type="button" class="cta" data-overlay-close>Back to Main Stage</button>
+        </div>
+
+        <div id="overlay-about" class="overlay-panel auth-card hidden" role="dialog" aria-labelledby="overlay-about-title">
+          <h1 id="overlay-about-title">About ITV</h1>
+          <p>
+            INTO THE VOID is a community platform for queuing music, chatting in real time,
+            rating tracks, and earning tokens for cosmetics and ranks.
+          </p>
+          <button type="button" class="cta" data-overlay-close>Back to Main Stage</button>
+        </div>
+
+        <div id="overlay-profile" class="overlay-panel auth-card hidden" role="dialog" aria-labelledby="overlay-profile-title">
+          <h1 id="overlay-profile-title">Profile</h1>
+          <p id="settings-greeting" class="auth-lead">Loading…</p>
+
+          <div id="profile-guest" class="hidden">
+            <p><a href="/login.html">Log in</a> to edit your avatar and custom saying.</p>
+            <p class="auth-footer">
+              <button type="button" class="link-btn" data-overlay-close>Back to Main Stage</button>
+            </p>
+          </div>
+
+          <div id="profile-form-block">
+            <p id="settings-error" class="auth-error hidden" role="alert"></p>
+            <p id="settings-ok" class="auth-ok hidden" role="status"></p>
+
+            <form id="form-profile" class="auth-form">
+              <label>
+                Avatar image URL
+                <input
+                  type="url"
+                  name="avatarUrl"
+                  placeholder="https://…"
+                  autocomplete="off"
+                />
+              </label>
+              <small class="field-hint">Leave empty to remove. Must be http:// or https://</small>
+
+              <div id="avatar-preview" class="avatar-preview hidden">
+                <img id="avatar-preview-img" alt="Avatar preview" />
+              </div>
+
+              <label>
+                Custom saying
+                <input
+                  type="text"
+                  name="customSaying"
+                  maxlength="120"
+                  placeholder="Shown on your profile later"
+                />
+              </label>
+
+              <button type="submit" class="btn-primary">Save changes</button>
+            </form>
+
+            <p class="auth-footer">
+              <button type="button" class="link-btn" data-overlay-close>Back to Main Stage</button>
+              · <a href="#" id="settings-logout">Log out</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <header class="site-nav">
       <div class="site-logo">
         <img
@@ -31,8 +107,8 @@
         />
       </div>
       <ul class="nav-links">
-        <li><a href="/home.html">Home</a></li>
-        <li><a href="/about.html">About Us</a></li>
+        <li><button type="button" class="nav-link" data-overlay="home">Home</button></li>
+        <li><button type="button" class="nav-link" data-overlay="about">About Us</button></li>
         <li><a href="/index.html" class="active">Main Stage</a></li>
       </ul>
       <div class="nav-actions">
@@ -195,6 +271,8 @@
     <script src="/js/version.js"></script>
     <script src="/js/itv-log.js"></script>
     <script src="/js/auth.js"></script>
+    <script src="/js/settings.js"></script>
+    <script src="/js/overlays.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="/js/player.js"></script>

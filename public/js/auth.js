@@ -70,15 +70,22 @@
       container.innerHTML = `
         <span class="nav-user-inner">
           ${av}
-          <a href="/settings.html" class="nav-username">${escapeHtml(state.user.username)}</a>
-          · <a href="/settings.html">Settings</a>
+          <button type="button" class="link-btn nav-username" id="nav-open-profile">${escapeHtml(state.user.username)}</button>
+          · <button type="button" class="link-btn" id="nav-open-settings">Settings</button>
           · <a href="#" id="nav-logout" class="nav-logout">Log out</a>
         </span>
       `;
+      const openProfile = (e) => {
+        e.preventDefault();
+        state.onOpenProfile?.();
+      };
+      container.querySelector('#nav-open-profile')?.addEventListener('click', openProfile);
+      container.querySelector('#nav-open-settings')?.addEventListener('click', openProfile);
       container.querySelector('#nav-logout')?.addEventListener('click', (e) => {
         e.preventDefault();
         clearAuth();
-        window.location.href = '/login.html';
+        state.onLogout?.();
+        if (!state.onLogout) window.location.href = '/login.html';
       });
       return;
     }

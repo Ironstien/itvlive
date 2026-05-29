@@ -78,6 +78,23 @@
     });
   }
 
+  function navState(extra = {}) {
+    return {
+      onChangeName: showNameModal,
+      onOpenProfile: () => ITVOverlays.open('profile'),
+      onLogout: () => {
+        if (socket?.connected) socket.disconnect();
+        loggedInUser = null;
+        window.location.href = '/login.html';
+      },
+      ...extra,
+    };
+  }
+
+  function renderNavUser(state = {}) {
+    ITVAuth.renderNav($('#nav-user'), navState(state));
+  }
+
   function getDisplayName() {
     return localStorage.getItem(STORAGE_NAME) || '';
   }
@@ -146,11 +163,10 @@
       mySocketId = socket.id;
       ITVLog.info('socket', 'Connected', { socketId: mySocketId });
       if (loggedInUser) {
-        ITVAuth.renderNav($('#nav-user'), { user: loggedInUser });
+        renderNavUser({ user: loggedInUser });
       } else {
-        ITVAuth.renderNav($('#nav-user'), {
+        renderNavUser({
           guestName: displayName,
-          onChangeName: showNameModal,
         });
         socket.emit('user:setName', { name: displayName });
       }
@@ -869,10 +885,25 @@
       toast('Server offline — run npm.cmd start', true);
     });
 
+  function initOverlays() {
+    ITVOverlays.init({
+      onUserUpdate: (user) => {
+        loggedInUser = user;
+        renderNavUser({ user });
+      },
+      onLogout: () => {
+        if (socket?.connected) socket.disconnect();
+        loggedInUser = null;
+        window.location.href = '/login.html';
+      },
+    });
+  }
+
   async function init() {
     ITVLog.initCapture();
     initPlaylistDragDrop();
     initVolumeControl();
+    initOverlays();
 
     const user = await ITVAuth.fetchMe();
     if (user) {
@@ -881,9 +912,8 @@
     }
 
     const existing = getDisplayName();
-    ITVAuth.renderNav($('#nav-user'), {
+    renderNavUser({
       guestName: existing || 'Guest',
-      onChangeName: showNameModal,
     });
     if (existing.length >= 2) {
       connectSocket({ displayName: existing });

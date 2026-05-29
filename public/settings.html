@@ -2,78 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0; url=/index.html?overlay=profile" />
     <title>INTO THE VOID — Settings</title>
-    <link rel="stylesheet" href="/css/variables.css" />
-    <link rel="stylesheet" href="/css/layout.css" />
-    <link rel="stylesheet" href="/css/auth.css" />
+    <script>window.location.replace('/index.html?overlay=profile');</script>
   </head>
-  <body class="page-auth">
-    <header class="site-nav">
-      <div class="site-logo">
-        <img
-          src="/img/itv-logo.png"
-          alt="Into The Void Live"
-          class="site-logo-img"
-          width="852"
-          height="151"
-          decoding="async"
-        />
-      </div>
-      <ul class="nav-links">
-        <li><a href="/home.html">Home</a></li>
-        <li><a href="/about.html">About Us</a></li>
-        <li><a href="/index.html">Main Stage</a></li>
-      </ul>
-      <div class="nav-user" id="nav-user"></div>
-    </header>
-
-    <main class="page-main auth-main">
-      <div class="auth-card">
-        <h1>Profile</h1>
-        <p id="settings-greeting" class="auth-lead">Loading…</p>
-
-        <p id="settings-error" class="auth-error hidden" role="alert"></p>
-        <p id="settings-ok" class="auth-ok hidden" role="status"></p>
-
-        <form id="form-profile" class="auth-form">
-          <label>
-            Avatar image URL
-            <input
-              type="url"
-              name="avatarUrl"
-              placeholder="https://…"
-              autocomplete="off"
-            />
-          </label>
-          <small class="field-hint">Leave empty to remove. Must be http:// or https://</small>
-
-          <div id="avatar-preview" class="avatar-preview hidden">
-            <img id="avatar-preview-img" alt="Avatar preview" />
-          </div>
-
-          <label>
-            Custom saying
-            <input
-              type="text"
-              name="customSaying"
-              maxlength="120"
-              placeholder="Shown on your profile later"
-            />
-          </label>
-
-          <button type="submit" class="btn-primary">Save changes</button>
-        </form>
-
-        <p class="auth-footer">
-          <a href="/index.html">Back to Main Stage</a>
-          · <a href="#" id="settings-logout">Log out</a>
-        </p>
-      </div>
-    </main>
-
-    <script src="/js/version.js"></script>
-    <script src="/js/auth.js"></script>
-    <script src="/js/settings.js"></script>
+  <body>
+    <p><a href="/index.html?overlay=profile">Continue to Main Stage…</a></p>
   </body>
 </html>
