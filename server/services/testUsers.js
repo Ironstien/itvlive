@@ -1,5 +1,5 @@
 const { TEST_USERS, CHAT_SNIPPETS, SAMPLE_TRACKS } = require('../data/testUsers');
-const { youtubeThumbnailUrl, resolveEmbeddableTrack } = require('./youtube');
+const { youtubeThumbnailUrl } = require('./youtube');
 
 const TEST_SOCKET_PREFIX = 'test:';
 
@@ -50,33 +50,6 @@ function buildBotPlaylist(botId, tracks) {
   }));
 }
 
-async function buildEmbeddableCatalogIndex() {
-  const byTitle = new Map();
-  for (const track of SAMPLE_TRACKS) {
-    const resolved = await resolveEmbeddableTrack(track);
-    if (resolved) byTitle.set(track.title, resolved);
-  }
-  return byTitle;
-}
-
-async function resolveValidatedPlaylist(tracks, catalogIndex) {
-  if (catalogIndex) {
-    const resolved = [];
-    for (const track of tracks || []) {
-      const hit = catalogIndex.get(track.title);
-      if (hit) resolved.push(hit);
-    }
-    return resolved;
-  }
-
-  const resolved = [];
-  for (const track of tracks || []) {
-    const validated = await resolveEmbeddableTrack(track);
-    if (validated) resolved.push(validated);
-  }
-  return resolved;
-}
-
 function formatChatLine(template, track) {
   return template
     .replace(/\{title\}/g, track?.title || 'this track')
@@ -95,10 +68,7 @@ function pickChatLine(track) {
 }
 
 function trackMetaFromNowPlaying(nowPlaying) {
-  const found = SAMPLE_TRACKS.find((t) => {
-    const ids = t.candidates || (t.videoId ? [t.videoId] : []);
-    return ids.includes(nowPlaying?.videoId);
-  });
+  const found = SAMPLE_TRACKS.find((t) => t.videoId === nowPlaying?.videoId);
   return found
     ? { title: found.title, channel: found.channel || null }
     : { title: nowPlaying?.title || 'this track', channel: null };
@@ -149,29 +119,15 @@ function notifyTrackStarted(room, broadcast) {
   scheduleTestUserChat(room, broadcast, np);
 }
 
-async function enableTestUsers(room) {
+function enableTestUsers(room) {
   if (enabled) return { ok: true, enabled: true, playlistSyncFor: null };
 
   let playlistSyncFor = null;
-  let joined = 0;
-  let skippedProfiles = 0;
-
-  const catalogIndex = await buildEmbeddableCatalogIndex();
-  if (catalogIndex.size === 0) {
-    return { error: 'No embeddable test tracks available — check network or YouTube access' };
-  }
 
   for (const profile of TEST_USERS) {
-    const validatedTracks = await resolveValidatedPlaylist(profile.playlist, catalogIndex);
-    if (validatedTracks.length === 0) {
-      skippedProfiles += 1;
-      console.warn(`[testUsers] skipped ${profile.displayName}: no embeddable tracks`);
-      continue;
-    }
-
     const socketId = botSocketId(profile.id);
     const account = buildBotAccount(profile);
-    const playlist = buildBotPlaylist(socketId, validatedTracks);
+    const playlist = buildBotPlaylist(socketId, profile.playlist);
 
     room.addBotUser(socketId, account, playlist);
 
@@ -179,18 +135,10 @@ async function enableTestUsers(room) {
     if (joinResult?.playlistSyncFor) {
       playlistSyncFor = joinResult.playlistSyncFor;
     }
-    if (joinResult?.ok) joined += 1;
-  }
-
-  if (joined === 0) {
-    return { error: 'No embeddable test tracks available — check network or YouTube access' };
   }
 
   enabled = true;
-  if (skippedProfiles > 0) {
-    console.warn(`[testUsers] enabled with ${joined} bots (${skippedProfiles} profiles skipped)`);
-  }
-  return { ok: true, enabled: true, playlistSyncFor, joined, skippedProfiles };
+  return { ok: true, enabled: true, playlistSyncFor };
 }
 
 function disableTestUsers(room) {
@@ -213,7 +161,7 @@ function disableTestUsers(room) {
   return { ok: true, enabled: false, playlistSyncFor };
 }
 
-async function toggleTestUsers(room) {
+function toggleTestUsers(room) {
   return enabled ? disableTestUsers(room) : enableTestUsers(room);
 }
 
@@ -240,5 +188,4 @@ module.exports = {
   toggleTestUsers,
   notifyTrackStarted,
   skipCurrentTestUserTrack,
-  resolveValidatedPlaylist,
 };

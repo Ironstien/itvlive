@@ -707,7 +707,7 @@
       ? `<p class="current-dj-stats__track"><strong>Now:</strong> ${escapeHtml(nowPlaying.title)}</p>`
       : '';
     return `
-      <div class="current-dj-stats">
+      <div class="current-dj-panel current-dj-panel--stats">
         <h3 class="current-dj-stats__name">${escapeHtml(u.displayName)}</h3>
         <p class="current-dj-stats__rank">${escapeHtml(buildVinylRankLine(u))}</p>
         ${saying}
@@ -726,13 +726,18 @@
     const dj = activeDjId ? (state.users || []).find((u) => u.socketId === activeDjId) : null;
 
     if (!dj || !state.nowPlaying) {
-      avatarEl.innerHTML = '<p class="current-dj__empty muted">No DJ</p>';
-      statsEl.innerHTML = '<p class="current-dj__empty muted">—</p>';
+      avatarEl.innerHTML =
+        '<div class="current-dj-panel current-dj-panel--avatar"><p class="current-dj__empty muted">No DJ</p></div>';
+      statsEl.innerHTML =
+        '<div class="current-dj-panel current-dj-panel--stats"><p class="current-dj__empty muted">—</p></div>';
       return;
     }
 
     avatarEl.innerHTML = '';
-    avatarEl.appendChild(createVinylUserEl(dj, { isOnAir: true, isCurrentDj: true }));
+    const avatarPanel = document.createElement('div');
+    avatarPanel.className = 'current-dj-panel current-dj-panel--avatar';
+    avatarPanel.appendChild(createVinylUserEl(dj, { isOnAir: true, isCurrentDj: true }));
+    avatarEl.appendChild(avatarPanel);
     statsEl.innerHTML = buildCurrentDjStats(dj, state.nowPlaying);
   }
 
@@ -745,7 +750,6 @@
       <div class="vinyl-record${spinClass}" aria-label="${escapeHtml(u.displayName)}">
         <div class="vinyl-record__label">
           ${labelContent}
-          <span class="vinyl-record__spindle" aria-hidden="true"></span>
         </div>
       </div>
     `;
@@ -864,7 +868,6 @@
     if (!requireSocket()) return;
     const btn = $('#btn-test-users');
     if (btn) btn.disabled = true;
-    toast('Validating test tracks…');
     socket.emit('dev:testUsers:toggle', {}, (res) => {
       if (btn) btn.disabled = false;
       if (res?.error) {

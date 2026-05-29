@@ -40,7 +40,7 @@
   --player-video-width: 420px;
   --player-video-height: calc(var(--player-video-width) * 9 / 16);
   --current-dj-disc-min: 88px;
-  --current-dj-stats-min-width: 118px;
+  --current-dj-panel-min-width: 118px;
   --player-max-width: 420px;
   --player-max-height: 236px;
   --void-bg-base: #030304;

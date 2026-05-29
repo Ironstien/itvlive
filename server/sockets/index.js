@@ -217,9 +217,9 @@ function registerSockets(httpServer) {
       }
     });
 
-    socket.on('dev:testUsers:toggle', async (_payload, ack) => {
+    socket.on('dev:testUsers:toggle', (_payload, ack) => {
       try {
-        const result = await toggleTestUsers(room);
+        const result = toggleTestUsers(room);
         if (result.error) {
           if (typeof ack === 'function') ack({ error: result.error });
           return;

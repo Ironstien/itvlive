@@ -356,12 +356,10 @@ a:hover {
 
 .current-dj--avatar {
   grid-column: 1;
-  grid-row: 1 / -1;
+  grid-row: 2;
   justify-content: flex-end;
-  align-items: center;
-  align-self: stretch;
-  container-type: size;
-  container-name: dj-avatar-slot;
+  align-items: stretch;
+  align-self: center;
 }
 
 .current-dj--stats {
@@ -371,7 +369,58 @@ a:hover {
   align-items: stretch;
   align-self: center;
   width: 100%;
+}
+
+.current-dj__empty {
+  margin: 0;
+  font-size: 0.72rem;
+  text-align: center;
+  align-self: center;
+}
+
+.current-dj-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: var(--current-dj-panel-min-width);
   height: var(--player-video-height);
+  padding: 0.45rem 0.5rem;
+  background: rgba(14, 12, 20, 0.88);
+  border: 1px solid var(--void-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.current-dj-panel--avatar {
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem;
+  container-type: size;
+  container-name: dj-avatar-panel;
+}
+
+.current-dj-panel--stats {
+  gap: 0.35rem;
+}
+
+.current-dj-panel--avatar .vinyl-user--current-dj {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.current-dj-panel--avatar .vinyl-user--current-dj .vinyl-record__label {
+  width: calc(var(--vinyl-label-ratio) * 100%);
+  height: calc(var(--vinyl-label-ratio) * 100%);
+}
+
+.current-dj-panel--avatar .vinyl-user--current-dj .vinyl-record__initial {
+  font-size: 18%;
 }
 
 .player-stage__slot {
@@ -403,27 +452,6 @@ a:hover {
   height: var(--player-video-height);
   max-width: 100%;
   aspect-ratio: 16 / 9;
-}
-
-.current-dj__empty {
-  margin: 0;
-  font-size: 0.72rem;
-  text-align: center;
-}
-
-.current-dj-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  width: 100%;
-  min-width: var(--current-dj-stats-min-width);
-  height: var(--player-video-height);
-  padding: 0.45rem 0.5rem;
-  background: rgba(14, 12, 20, 0.88);
-  border: 1px solid var(--void-border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  box-sizing: border-box;
 }
 
 .current-dj-stats__name {
@@ -472,30 +500,6 @@ a:hover {
 .current-dj-stats__track strong {
   color: var(--purple-bright);
   font-weight: 600;
-}
-
-.current-dj--avatar .vinyl-user--current-dj {
-  width: min(100cqw, 100cqh, var(--player-video-height));
-  height: min(100cqw, 100cqh, var(--player-video-height));
-  min-width: var(--current-dj-disc-min);
-  min-height: var(--current-dj-disc-min);
-  max-width: var(--player-video-height);
-  max-height: var(--player-video-height);
-  aspect-ratio: 1 / 1;
-}
-
-.current-dj--avatar .vinyl-user--current-dj .vinyl-record__label {
-  width: calc(var(--vinyl-label-ratio) * 100%);
-  height: calc(var(--vinyl-label-ratio) * 100%);
-}
-
-.current-dj--avatar .vinyl-user--current-dj .vinyl-record__initial {
-  font-size: 18%;
-}
-
-.current-dj--avatar .vinyl-user--current-dj .vinyl-record__spindle {
-  width: calc(var(--vinyl-label-ratio) * 12%);
-  height: calc(var(--vinyl-label-ratio) * 12%);
 }
 
 .player-wrap {
@@ -790,28 +794,30 @@ a:hover {
     max-width: var(--player-max-width);
   }
 
-  .current-dj--avatar {
-    grid-row: auto;
-    justify-content: center;
+  .current-dj-panel {
     height: auto;
-    align-self: center;
+    min-height: 0;
   }
 
-  .current-dj--avatar .vinyl-user--current-dj {
-    width: min(var(--player-video-height), 100%);
-    height: min(var(--player-video-height), 100%);
+  .current-dj-panel--avatar {
     container-type: normal;
+    aspect-ratio: 1 / 1;
+    max-width: var(--player-video-height);
+    margin-inline: auto;
+  }
+
+  .current-dj-panel--avatar .vinyl-user--current-dj {
+    width: min(100%, 100%);
+    height: min(100%, 100%);
+  }
+
+  .current-dj--avatar {
+    justify-content: center;
   }
 
   .current-dj--stats {
     width: 100%;
     max-width: var(--player-max-width);
-    height: auto;
-  }
-
-  .current-dj-stats {
-    height: auto;
-    min-height: 0;
   }
 
   .player-stack {

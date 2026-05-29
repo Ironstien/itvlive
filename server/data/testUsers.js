@@ -1,151 +1,156 @@
 /**
  * Dummy users for local/dev testing. Toggle via the "Test Users" button on Main Stage.
- * Each user includes profile fields and a playlist of 3 alternative 90s tracks.
- *
- * Track `candidates` are tried in order at enable time; only embeddable IDs are kept.
- * IDs verified for iframe playback via server-side watch-page probe (May 2026).
+ * Each user has a fixed playlist of 3 embeddable 90s alternative tracks (iframe-verified).
  */
 
-const SAMPLE_TRACKS = [
-  {
+/** @typedef {{ videoId: string, title: string, channel: string, duration: number }} TestTrack */
+
+/** @type {Record<string, TestTrack>} */
+const TRACK = {
+  teenSpirit: {
+    videoId: 'hTWKbfoikeg',
     title: 'Smells Like Teen Spirit',
     channel: 'Nirvana',
     duration: 301,
-    candidates: ['hTWKbfoikeg'],
   },
-  {
+  creep: {
+    videoId: 'XFkzRNyygfk',
     title: 'Creep',
     channel: 'Radiohead',
     duration: 238,
-    candidates: ['XFkzRNyygfk'],
   },
-  {
+  everlong: {
+    videoId: 'eBG7P-K-r1Y',
     title: 'Everlong',
     channel: 'Foo Fighters',
     duration: 250,
-    candidates: ['eBG7P-K-r1Y'],
   },
-  {
+  wonderwall: {
+    videoId: 'bx1Bh8ZvH84',
     title: 'Wonderwall',
     channel: 'Oasis',
     duration: 258,
-    candidates: ['bx1Bh8ZvH84'],
   },
-  {
+  song2: {
+    videoId: 'SSbBvKaM6sk',
     title: 'Song 2',
     channel: 'Blur',
     duration: 122,
-    candidates: ['SSbBvKaM6sk'],
   },
-  {
+  noRain: {
+    videoId: '3qVPNONdF58',
     title: 'No Rain',
     channel: 'Blind Melon',
     duration: 217,
-    candidates: ['3qVPNONdF58'],
   },
-  {
+  y1979: {
+    videoId: '4aeETEoNfOg',
     title: '1979',
     channel: 'The Smashing Pumpkins',
     duration: 266,
-    candidates: ['4aeETEoNfOg'],
   },
-  {
+  tonight: {
+    videoId: 'NOG3eus4ZSo',
     title: 'Tonight, Tonight',
     channel: 'The Smashing Pumpkins',
     duration: 285,
-    candidates: ['NOG3eus4ZSo'],
   },
-  {
+  linger: {
+    videoId: 'G6Kspj3OO0s',
     title: 'Linger',
     channel: 'The Cranberries',
     duration: 274,
-    candidates: ['G6Kspj3OO0s'],
   },
-  {
+  dreams: {
+    videoId: 'Yam5uK6e-bQ',
     title: 'Dreams',
     channel: 'The Cranberries',
     duration: 280,
-    candidates: ['Yam5uK6e-bQ'],
   },
-  {
+  basketCase: {
+    videoId: 'NUTGr5t3MoY',
     title: 'Basket Case',
     channel: 'Green Day',
     duration: 181,
-    candidates: ['NUTGr5t3MoY'],
   },
-  {
+  manInBox: {
+    videoId: 'TAqZb52sgpU',
     title: 'Man in the Box',
     channel: 'Alice In Chains',
     duration: 285,
-    candidates: ['TAqZb52sgpU'],
   },
-  {
+  interstate: {
+    videoId: 'yjJL9DGU7Gg',
     title: 'Interstate Love Song',
     channel: 'Stone Temple Pilots',
     duration: 202,
-    candidates: ['yjJL9DGU7Gg'],
   },
-  {
+  closingTime: {
+    videoId: 'xGytDsqkQY8',
     title: 'Closing Time',
     channel: 'Semisonic',
     duration: 274,
-    candidates: ['xGytDsqkQY8'],
   },
-  {
+  oneHeadlight: {
+    videoId: 'Zzyfcys1aLM',
     title: 'One Headlight',
     channel: 'The Wallflowers',
     duration: 270,
-    candidates: ['Zzyfcys1aLM'],
   },
-  {
+  learnToFly: {
+    videoId: '1VQ_3sBZEm0',
     title: 'Learn To Fly',
     channel: 'Foo Fighters',
     duration: 295,
-    candidates: ['1VQ_3sBZEm0'],
   },
-  {
+  myHero: {
+    videoId: 'EqWRaAF6_WY',
     title: 'My Hero',
     channel: 'Foo Fighters',
     duration: 260,
-    candidates: ['EqWRaAF6_WY'],
   },
-  {
+  prettyFly: {
+    videoId: 'QtTR-_Klcq8',
     title: 'Pretty Fly (For A White Guy)',
     channel: 'The Offspring',
     duration: 200,
-    candidates: ['QtTR-_Klcq8'],
   },
-  {
+  mrJones: {
+    videoId: '-oqAU5VxFWs',
     title: 'Mr. Jones',
     channel: 'Counting Crows',
     duration: 270,
-    candidates: ['-oqAU5VxFWs'],
   },
-  {
+  worstEnemy: {
+    videoId: 'sc5iTNVEOAg',
     title: 'My Own Worst Enemy',
     channel: 'Lit',
     duration: 170,
-    candidates: ['sc5iTNVEOAg'],
   },
-  {
+  youGetWhat: {
+    videoId: 'DL7-CKirWZE',
     title: 'You Get What You Give',
     channel: 'New Radicals',
     duration: 330,
-    candidates: ['DL7-CKirWZE'],
   },
-  {
+  lovefool: {
+    videoId: 'NI6aOFI7hms',
     title: 'Lovefool',
     channel: 'The Cardigans',
     duration: 200,
-    candidates: ['NI6aOFI7hms'],
   },
-  {
+  shesElectric: {
+    videoId: 'h9JZWhjQDvc',
     title: "She's Electric",
     channel: 'Oasis',
     duration: 240,
-    candidates: ['h9JZWhjQDvc'],
   },
-];
+};
+
+/** @param {...TestTrack} tracks */
+function pl(...tracks) {
+  return tracks.map((t) => ({ ...t }));
+}
 
 /** Generic chat lines about alt 90s tracks — {title} and {channel} are substituted. */
 const CHAT_SNIPPETS = [
@@ -171,15 +176,6 @@ const CHAT_SNIPPETS = [
   'This is why I joined the pit',
 ];
 
-/** Pick `count` tracks starting at `offset` (wraps around the sample pool). */
-function pickTracks(offset, count = 3) {
-  const tracks = [];
-  for (let i = 0; i < count; i += 1) {
-    tracks.push(SAMPLE_TRACKS[(offset + i) % SAMPLE_TRACKS.length]);
-  }
-  return tracks;
-}
-
 const TEST_USERS = [
   {
     id: 'neon-pulse',
@@ -188,7 +184,7 @@ const TEST_USERS = [
     customSaying: 'Vibing in the void',
     badges: ['Night Owl'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=NeonPulse',
-    playlist: pickTracks(0, 3),
+    playlist: pl(TRACK.teenSpirit, TRACK.creep, TRACK.everlong),
   },
   {
     id: 'void-walker',
@@ -197,7 +193,7 @@ const TEST_USERS = [
     customSaying: 'Queue is life',
     badges: ['Regular'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=VoidWalker',
-    playlist: pickTracks(3, 3),
+    playlist: pl(TRACK.wonderwall, TRACK.song2, TRACK.noRain),
   },
   {
     id: 'bass-oracle',
@@ -206,7 +202,7 @@ const TEST_USERS = [
     customSaying: 'Turn it up',
     badges: ['Veteran', 'Bass Head'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=BassOracle',
-    playlist: pickTracks(6, 3),
+    playlist: pl(TRACK.y1979, TRACK.tonight, TRACK.linger),
   },
   {
     id: 'crystal-echo',
@@ -215,7 +211,7 @@ const TEST_USERS = [
     customSaying: 'Crystal clear beats',
     badges: [],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CrystalEcho',
-    playlist: pickTracks(9, 3),
+    playlist: pl(TRACK.dreams, TRACK.basketCase, TRACK.manInBox),
   },
   {
     id: 'static-dream',
@@ -224,7 +220,7 @@ const TEST_USERS = [
     customSaying: 'Just dropped in',
     badges: ['Newcomer'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=StaticDream',
-    playlist: pickTracks(12, 3),
+    playlist: pl(TRACK.interstate, TRACK.closingTime, TRACK.oneHeadlight),
   },
   {
     id: 'purple-haze',
@@ -233,7 +229,7 @@ const TEST_USERS = [
     customSaying: 'Purple rain incoming',
     badges: ['Collector'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=PurpleHaze88',
-    playlist: pickTracks(15, 3),
+    playlist: pl(TRACK.learnToFly, TRACK.myHero, TRACK.prettyFly),
   },
   {
     id: 'echo-unit',
@@ -243,7 +239,7 @@ const TEST_USERS = [
     customSaying: 'Keeping the pit smooth',
     badges: ['Moderator'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=EchoUnit',
-    playlist: pickTracks(18, 3),
+    playlist: pl(TRACK.mrJones, TRACK.worstEnemy, TRACK.youGetWhat),
   },
   {
     id: 'night-frequency',
@@ -252,7 +248,7 @@ const TEST_USERS = [
     customSaying: 'Elite ears only',
     badges: ['Elite', 'Top Voter'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=NightFrequency',
-    playlist: pickTracks(21, 3),
+    playlist: pl(TRACK.lovefool, TRACK.shesElectric, TRACK.teenSpirit),
   },
   {
     id: 'glitch-saint',
@@ -261,7 +257,7 @@ const TEST_USERS = [
     customSaying: 'Bless this queue',
     badges: ['Glitch'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=GlitchSaint',
-    playlist: pickTracks(0, 3),
+    playlist: pl(TRACK.creep, TRACK.everlong, TRACK.wonderwall),
   },
   {
     id: 'zero-signal',
@@ -270,7 +266,7 @@ const TEST_USERS = [
     customSaying: 'Signal acquired',
     badges: [],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ZeroSignal',
-    playlist: pickTracks(3, 3),
+    playlist: pl(TRACK.song2, TRACK.noRain, TRACK.y1979),
   },
   {
     id: 'amber-static',
@@ -279,7 +275,7 @@ const TEST_USERS = [
     customSaying: 'Tape hiss is a feature',
     badges: ['Collector'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AmberStatic',
-    playlist: pickTracks(6, 3),
+    playlist: pl(TRACK.tonight, TRACK.linger, TRACK.dreams),
   },
   {
     id: 'lofi-rebel',
@@ -288,7 +284,7 @@ const TEST_USERS = [
     customSaying: 'Distortion is love',
     badges: ['Regular'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=LoFiRebel',
-    playlist: pickTracks(9, 3),
+    playlist: pl(TRACK.basketCase, TRACK.manInBox, TRACK.interstate),
   },
   {
     id: 'grunge-pilot',
@@ -297,7 +293,7 @@ const TEST_USERS = [
     customSaying: 'Seattle sound forever',
     badges: ['Veteran'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=GrungePilot',
-    playlist: pickTracks(12, 3),
+    playlist: pl(TRACK.closingTime, TRACK.oneHeadlight, TRACK.learnToFly),
   },
   {
     id: 'cassette-kid',
@@ -306,7 +302,7 @@ const TEST_USERS = [
     customSaying: 'Side A only',
     badges: ['Newcomer'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CassetteKid',
-    playlist: pickTracks(15, 3),
+    playlist: pl(TRACK.myHero, TRACK.prettyFly, TRACK.mrJones),
   },
   {
     id: 'vinyl-shade',
@@ -315,7 +311,7 @@ const TEST_USERS = [
     customSaying: 'Needle down',
     badges: ['Night Owl'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=VinylShade',
-    playlist: pickTracks(18, 3),
+    playlist: pl(TRACK.worstEnemy, TRACK.youGetWhat, TRACK.lovefool),
   },
   {
     id: 'drift-wave',
@@ -324,7 +320,7 @@ const TEST_USERS = [
     customSaying: 'Floating through tracks',
     badges: [],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DriftWave',
-    playlist: pickTracks(21, 3),
+    playlist: pl(TRACK.shesElectric, TRACK.noRain, TRACK.basketCase),
   },
   {
     id: 'alt-frequency',
@@ -333,7 +329,7 @@ const TEST_USERS = [
     customSaying: 'FM static dreams',
     badges: ['Elite'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=AltFrequency',
-    playlist: pickTracks(1, 3),
+    playlist: pl(TRACK.creep, TRACK.y1979, TRACK.closingTime),
   },
   {
     id: 'mud-honey',
@@ -342,7 +338,7 @@ const TEST_USERS = [
     customSaying: 'Louder than love',
     badges: ['Bass Head'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MudHoney',
-    playlist: pickTracks(4, 3),
+    playlist: pl(TRACK.everlong, TRACK.manInBox, TRACK.myHero),
   },
   {
     id: 'feedback-loop',
@@ -351,7 +347,7 @@ const TEST_USERS = [
     customSaying: 'Echo chamber vibes',
     badges: ['Glitch'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=FeedbackLoop',
-    playlist: pickTracks(7, 3),
+    playlist: pl(TRACK.wonderwall, TRACK.linger, TRACK.prettyFly),
   },
   {
     id: 'rain-city',
@@ -360,7 +356,7 @@ const TEST_USERS = [
     customSaying: 'Pacific northwest mood',
     badges: ['Regular'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=RainCity',
-    playlist: pickTracks(10, 3),
+    playlist: pl(TRACK.teenSpirit, TRACK.tonight, TRACK.oneHeadlight),
   },
   {
     id: 'sonic-flannel',
@@ -369,7 +365,7 @@ const TEST_USERS = [
     customSaying: 'Plaid and power chords',
     badges: ['Top Voter', 'Veteran'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=SonicFlannel',
-    playlist: pickTracks(13, 3),
+    playlist: pl(TRACK.song2, TRACK.dreams, TRACK.interstate),
   },
   {
     id: 'dim-channel',
@@ -378,7 +374,7 @@ const TEST_USERS = [
     customSaying: 'Late night dial',
     badges: [],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DimChannel',
-    playlist: pickTracks(16, 3),
+    playlist: pl(TRACK.learnToFly, TRACK.mrJones, TRACK.lovefool),
   },
   {
     id: 'fuzz-cathedral',
@@ -387,7 +383,7 @@ const TEST_USERS = [
     customSaying: 'Wall of sound',
     badges: ['Collector'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=FuzzCathedral',
-    playlist: pickTracks(19, 3),
+    playlist: pl(TRACK.youGetWhat, TRACK.shesElectric, TRACK.basketCase),
   },
   {
     id: 'tape-hiss',
@@ -396,8 +392,11 @@ const TEST_USERS = [
     customSaying: 'Analog warmth only',
     badges: ['Night Owl'],
     avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=TapeHiss',
-    playlist: pickTracks(2, 3),
+    playlist: pl(TRACK.worstEnemy, TRACK.manInBox, TRACK.y1979),
   },
 ];
 
-module.exports = { TEST_USERS, SAMPLE_TRACKS, CHAT_SNIPPETS };
+/** All unique tracks across test-user playlists (for chat templating). */
+const SAMPLE_TRACKS = Object.values(TRACK);
+
+module.exports = { TEST_USERS, SAMPLE_TRACKS, CHAT_SNIPPETS, TRACK };
