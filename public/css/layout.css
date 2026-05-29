@@ -475,12 +475,12 @@ a:hover {
 }
 
 .current-dj--avatar .vinyl-user--current-dj {
-  width: min(100cqw, 100cqh);
-  height: min(100cqw, 100cqh);
+  width: min(100cqw, 100cqh, var(--player-video-height));
+  height: min(100cqw, 100cqh, var(--player-video-height));
   min-width: var(--current-dj-disc-min);
   min-height: var(--current-dj-disc-min);
-  max-width: 100%;
-  max-height: 100%;
+  max-width: var(--player-video-height);
+  max-height: var(--player-video-height);
   aspect-ratio: 1 / 1;
 }
 
