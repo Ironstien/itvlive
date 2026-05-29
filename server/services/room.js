@@ -170,6 +170,65 @@ class Room {
     return { ok: true, playlist: next };
   }
 
+  async importToPlaylist(socketId, urls) {
+    if (!Array.isArray(urls) || urls.length === 0) {
+      return { error: 'No URLs to import' };
+    }
+
+    const MAX_IMPORT = 100;
+    const lines = urls
+      .map((line) => String(line || '').trim())
+      .filter((line) => line && !line.startsWith('#'));
+    if (!lines.length) return { error: 'No valid URLs found in file' };
+    if (lines.length > MAX_IMPORT) {
+      return { error: `Import limited to ${MAX_IMPORT} URLs per file` };
+    }
+
+    const pl = this.playlists.get(socketId) || [];
+    const existingIds = new Set(pl.map((s) => s.videoId));
+    let added = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const line of lines) {
+      const videoId = parseYoutubeId(line);
+      if (!videoId) {
+        failed += 1;
+        continue;
+      }
+      if (existingIds.has(videoId)) {
+        skipped += 1;
+        continue;
+      }
+
+      let meta;
+      try {
+        meta = await fetchYoutubeMeta(videoId);
+      } catch {
+        failed += 1;
+        continue;
+      }
+
+      pl.push({
+        id: `${socketId}-${Date.now()}-${added}`,
+        videoId: meta.videoId,
+        title: meta.title,
+        thumbnail: meta.thumbnail,
+        channel: meta.channel,
+        duration: meta.duration,
+      });
+      existingIds.add(meta.videoId);
+      added += 1;
+    }
+
+    this.playlists.set(socketId, pl);
+    if (added === 0 && skipped === 0 && failed > 0) {
+      return { error: 'Could not import any songs from that file' };
+    }
+
+    return { ok: true, playlist: this.getPlaylist(socketId), added, skipped, failed };
+  }
+
   ripCurrentSong(socketId) {
     if (!this.nowPlaying) return { error: 'Nothing is playing' };
     const pl = this.playlists.get(socketId) || [];

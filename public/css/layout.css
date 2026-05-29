@@ -262,6 +262,30 @@ a:hover {
   padding-left: 0.65rem;
 }
 
+.playlist-io {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  padding: 0.5rem 0 0 0.65rem;
+  border-top: 1px solid var(--void-border);
+  margin-top: 0.5rem;
+}
+
+.playlist-io .btn-ghost {
+  flex: 1;
+  text-align: center;
+}
+
+.playlist-io .btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.playlist-io .btn-ghost:disabled:hover {
+  border-color: var(--void-border);
+  color: var(--grey-text);
+}
+
 .panel-chat {
   display: flex;
   flex-direction: column;

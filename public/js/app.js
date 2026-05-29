@@ -313,6 +313,84 @@
     return parts.join(' • ');
   }
 
+  function youtubeWatchUrl(videoId) {
+    return `https://www.youtube.com/watch?v=${videoId}`;
+  }
+
+  function updatePlaylistExportButton(list) {
+    const btn = $('#btn-playlist-export');
+    if (btn) btn.disabled = !list?.length;
+  }
+
+  function exportPlaylist() {
+    if (!myPlaylist.length) {
+      toast('Nothing to export — add songs first', true);
+      return;
+    }
+
+    const lines = myPlaylist.map((item) => youtubeWatchUrl(item.videoId));
+    const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `itv-playlist-${date}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast(`Exported ${lines.length} song${lines.length === 1 ? '' : 's'}`);
+  }
+
+  function parsePlaylistImportText(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+  }
+
+  async function importPlaylistFromFile(file) {
+    if (!file) return;
+    if (!requireSocket()) return;
+
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      toast('Could not read that file', true);
+      return;
+    }
+
+    const urls = parsePlaylistImportText(text);
+    if (!urls.length) {
+      toast('No YouTube URLs found in file', true);
+      return;
+    }
+
+    const importBtn = $('#btn-playlist-import');
+    const exportBtn = $('#btn-playlist-export');
+    if (importBtn) importBtn.disabled = true;
+    if (exportBtn) exportBtn.disabled = true;
+    toast(`Importing ${urls.length} URL${urls.length === 1 ? '' : 's'}…`);
+
+    try {
+      const res = await emitAck('playlist:import', { urls }, 120000);
+      if (res.error) {
+        toast(res.error, true);
+        return;
+      }
+
+      const parts = [];
+      if (res.added) parts.push(`${res.added} added`);
+      if (res.skipped) parts.push(`${res.skipped} skipped`);
+      if (res.failed) parts.push(`${res.failed} failed`);
+      toast(parts.length ? `Import complete — ${parts.join(', ')}` : 'Import complete');
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      if (importBtn) importBtn.disabled = false;
+      updatePlaylistExportButton(myPlaylist);
+    }
+  }
+
   function reorderPlaylistIds(dragId, targetId, insertBefore) {
     const ids = myPlaylist.map((s) => s.id);
     const from = ids.indexOf(dragId);
@@ -402,6 +480,7 @@
     const ul = $('#playlist-list');
     if (!ul) return;
     ul.innerHTML = '';
+    updatePlaylistExportButton(list);
     if (!list.length) {
       ul.innerHTML = '<li class="muted">No songs yet — paste a YouTube link above.</li>';
       return;
@@ -554,6 +633,18 @@
       if (res?.error) toast(res.error, true);
       else toast('Ripped to your playlist');
     });
+  });
+
+  $('#btn-playlist-export')?.addEventListener('click', exportPlaylist);
+
+  const playlistImportInput = $('#playlist-import-input');
+  $('#btn-playlist-import')?.addEventListener('click', () => {
+    playlistImportInput?.click();
+  });
+  playlistImportInput?.addEventListener('change', async () => {
+    const file = playlistImportInput.files?.[0];
+    playlistImportInput.value = '';
+    await importPlaylistFromFile(file);
   });
 
   $('#btn-queue-action')?.addEventListener('click', () => {

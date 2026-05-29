@@ -62,6 +62,20 @@
           <div class="playlist-scroll">
             <ul id="playlist-list" class="playlist-list"></ul>
           </div>
+          <div class="playlist-io">
+            <input
+              type="file"
+              id="playlist-import-input"
+              accept=".txt,text/plain"
+              class="hidden"
+              aria-hidden="true"
+              tabindex="-1"
+            />
+            <button type="button" id="btn-playlist-import" class="btn-ghost btn-sm">Import</button>
+            <button type="button" id="btn-playlist-export" class="btn-ghost btn-sm" disabled>
+              Export
+            </button>
+          </div>
         </div>
       </aside>
 

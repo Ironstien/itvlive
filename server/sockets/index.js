@@ -159,6 +159,19 @@ function registerSockets(httpServer) {
       }
     });
 
+    socket.on('playlist:import', async (payload, ack) => {
+      try {
+        const result = await room.importToPlaylist(socket.id, payload?.urls);
+        if (typeof ack === 'function') ack(result);
+        if (result.ok) {
+          await persistPlaylist(socket.id);
+          socket.emit('playlist:sync', result.playlist);
+        }
+      } catch (err) {
+        if (typeof ack === 'function') ack({ error: err.message || 'Server error' });
+      }
+    });
+
     socket.on('queue:join', async (_payload, ack) => {
       const result = room.joinQueue(socket.id);
       if (typeof ack === 'function') ack(result);
