@@ -286,11 +286,16 @@
   function updateSkipTestTrackButton(state) {
     const btn = $('#btn-skip-test-track');
     if (!btn) return;
-    const show =
-      !!state?.testUsersEnabled &&
+    const testUsersOn = !!state?.testUsersEnabled;
+    const canSkip =
+      testUsersOn &&
       !!state?.nowPlaying &&
       isTestUserSocketId(state.nowPlaying.socketId);
-    show(btn, show);
+    show(btn, testUsersOn);
+    btn.disabled = !canSkip;
+    btn.title = canSkip
+      ? "Skip the current test user's song (dev)"
+      : 'Available when a test user is DJ';
   }
 
   function updateQueueButton(state) {

@@ -177,15 +177,6 @@ a:hover {
   box-shadow: var(--shadow-glow);
 }
 
-.btn-skip-test {
-  color: var(--grey-muted);
-}
-
-.btn-skip-test:not(.hidden):hover {
-  color: #f0a060;
-  border-color: #c07030;
-}
-
 .btn-nav-log {
   padding: 0.28rem 0.55rem;
   border: 1px solid var(--void-border);
@@ -489,6 +480,16 @@ a:hover {
   flex-shrink: 0;
   min-width: 6.5rem;
   white-space: nowrap;
+}
+
+.btn-skip-test {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.btn-skip-test:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .vote-block {

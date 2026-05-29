@@ -123,14 +123,6 @@
         >
           Test Users
         </button>
-        <button
-          type="button"
-          id="btn-skip-test-track"
-          class="btn-test-users btn-skip-test hidden"
-          title="Skip the current test user's song (dev)"
-        >
-          Skip Track
-        </button>
         <div class="nav-user" id="nav-user">Connecting…</div>
       </div>
     </header>
@@ -222,6 +214,15 @@
           <div class="controls-row">
             <button type="button" class="btn-primary btn-sm btn-queue-action" id="btn-queue-action" data-mode="join">
               Join Queue
+            </button>
+            <button
+              type="button"
+              id="btn-skip-test-track"
+              class="btn-ghost btn-sm btn-skip-test hidden"
+              disabled
+              title="Skip the current test user's song (dev)"
+            >
+              Skip Track
             </button>
 
             <div class="vote-block">
