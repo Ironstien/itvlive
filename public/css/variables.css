@@ -35,8 +35,10 @@
     )
   );
   --vinyl-label-ratio: 0.42;
-  --current-dj-disc-size: 88px;
-  --current-dj-stats-width: 118px;
+  --player-flank-gap: 0.5rem;
+  --current-dj-disc-min: 88px;
+  --current-dj-disc-max: var(--player-max-height);
+  --current-dj-stats-min-width: 118px;
   --player-max-width: 420px;
   --player-max-height: 236px;
   --void-bg-base: #030304;
