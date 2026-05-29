@@ -27,6 +27,14 @@
       const timer = setTimeout(() => reject(new Error('Request timed out — is the server running?')), timeoutMs);
       socket.emit(event, payload, (res) => {
         clearTimeout(timer);
+        if (res?.error) {
+          ITVLog.warn('socket', `ack ${event} error`, {
+            error: res.error,
+            payload: ITVLog.summarizePayload(payload),
+          });
+        } else {
+          ITVLog.debug('socket', `ack ${event} ok`, ITVLog.summarizePayload(res));
+        }
         resolve(res || {});
       });
     });
@@ -34,12 +42,14 @@
 
   const toast = (msg, isError) => {
     const el = $('#control-toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.classList.toggle('error', !!isError);
-    show(el, true);
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => show(el, false), 4000);
+    if (el) {
+      el.textContent = msg;
+      el.classList.toggle('error', !!isError);
+      show(el, true);
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => show(el, false), 4000);
+    }
+    ITVLog.log(isError ? 'warn' : 'info', 'user', `Toast: ${msg}`, { isError: !!isError });
   };
 
   let socket = null;
@@ -76,6 +86,40 @@
     localStorage.setItem(STORAGE_NAME, name);
   }
 
+  function instrumentSocket(sock) {
+    const rawEmit = sock.emit.bind(sock);
+    sock.emit = function (event, payload, ack) {
+      ITVLog.debug('socket', `emit ${event}`, ITVLog.summarizePayload(payload));
+      return rawEmit(event, payload, ack);
+    };
+  }
+
+  function applyPlaylistSync(list, source) {
+    const prev = myPlaylist;
+    const prevCount = prev.length;
+    const next = list || [];
+    const newCount = next.length;
+    const data = {
+      source,
+      prevCount,
+      newCount,
+      delta: newCount - prevCount,
+      prevVideoIds: prev.map((i) => i.videoId),
+      nextVideoIds: next.map((i) => i.videoId),
+    };
+
+    if (newCount === 0 && prevCount > 0) {
+      ITVLog.warn('playlist', 'Playlist emptied', data);
+    } else if (newCount < prevCount) {
+      ITVLog.warn('playlist', 'Playlist shrunk', data);
+    } else {
+      ITVLog.info('playlist', 'playlist:sync', data);
+    }
+
+    myPlaylist = next;
+    renderPlaylist(myPlaylist);
+  }
+
   function connectSocket(opts) {
     const displayName = typeof opts === 'string' ? opts : opts?.displayName;
     const token = typeof opts === 'object' && opts ? opts.token : null;
@@ -91,9 +135,16 @@
     loggedInUser = profile || null;
     const auth = token ? { token } : { displayName };
     socket = io({ auth });
+    instrumentSocket(socket);
+
+    ITVLog.info('socket', 'Connecting', {
+      authenticated: !!token,
+      displayName: displayName || loggedInUser?.username || null,
+    });
 
     socket.on('connect', () => {
       mySocketId = socket.id;
+      ITVLog.info('socket', 'Connected', { socketId: mySocketId });
       if (loggedInUser) {
         ITVAuth.renderNav($('#nav-user'), { user: loggedInUser });
       } else {
@@ -106,27 +157,52 @@
     });
 
     socket.on('connect_error', (err) => {
+      ITVLog.error('socket', 'connect_error', { message: err.message || String(err) });
       toast(err.message || 'Could not connect to live server', true);
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      ITVLog.warn('socket', 'Disconnected', { reason: reason || 'unknown' });
       toast('Disconnected — refresh page', true);
     });
 
     socket.on('room:state', (state) => {
+      const prevVideoId = roomState?.nowPlaying?.videoId ?? null;
+      const nextVideoId = state?.nowPlaying?.videoId ?? null;
+      if (prevVideoId !== nextVideoId) {
+        ITVLog.info('room', 'nowPlaying changed', {
+          fromVideoId: prevVideoId,
+          toVideoId: nextVideoId,
+          djName: state?.nowPlaying?.djName || null,
+          title: state?.nowPlaying?.title || null,
+        });
+      }
+      const prevQueueLen = roomState?.globalQueue?.length ?? 0;
+      const nextQueueLen = state?.globalQueue?.length ?? 0;
+      if (prevQueueLen !== nextQueueLen) {
+        ITVLog.debug('queue', 'Queue length changed', {
+          from: prevQueueLen,
+          to: nextQueueLen,
+        });
+      }
       roomState = state;
       renderRoom(state);
     });
 
     socket.on('player:sync', (payload) => {
+      ITVLog.info('player', 'player:sync received', {
+        videoId: payload?.videoId || null,
+        title: payload?.title || null,
+        djName: payload?.djName || null,
+        startedAt: payload?.startedAt || null,
+      });
       ITVPlayer.sync(payload);
       ITVAmbient.sync(payload, () => ITVPlayer.getCurrentTime());
       updateDjBanner(payload);
     });
 
     socket.on('playlist:sync', (list) => {
-      myPlaylist = list || [];
-      renderPlaylist(myPlaylist);
+      applyPlaylistSync(list, 'server');
     });
   }
 
@@ -328,6 +404,7 @@
       return;
     }
 
+    ITVLog.info('user', 'playlist export', { count: myPlaylist.length });
     const date = new Date().toISOString().slice(0, 10);
     const header = [
       `# ITV Playlist — exported ${date}`,
@@ -373,6 +450,7 @@
       return;
     }
 
+    ITVLog.info('user', 'playlist import started', { lineCount: urls.length, fileName: file.name });
     const importBtn = $('#btn-playlist-import');
     const exportBtn = $('#btn-playlist-export');
     if (importBtn) importBtn.disabled = true;
@@ -478,6 +556,7 @@
       dragId = null;
 
       if (!orderedIds) return;
+      ITVLog.info('user', 'playlist:reorder', { orderedIds });
       socket.emit('playlist:reorder', { orderedIds }, (res) => {
         if (res?.error) toast(res.error, true);
       });
@@ -511,6 +590,11 @@
         </span>
       `;
       li.querySelector('[data-remove]').addEventListener('click', () => {
+        ITVLog.info('user', 'playlist:remove clicked', {
+          itemId: item.id,
+          videoId: item.videoId,
+          title: item.title,
+        });
         socket.emit('playlist:remove', { itemId: item.id }, (res) => {
           if (res?.error) toast(res.error, true);
         });
@@ -606,6 +690,7 @@
       toast('Name must be at least 2 characters', true);
       return;
     }
+    ITVLog.info('user', 'Guest join', { displayName: trimmed });
     saveDisplayName(trimmed);
     hideNameModal();
     connectSocket({ displayName: trimmed });
@@ -664,6 +749,7 @@
     };
     const action = actions[mode];
     if (!action) return;
+    ITVLog.info('user', `queue action: ${mode}`, { event: action.event });
     socket.emit(action.event, {}, (res) => {
       if (res?.error) toast(res.error, true);
       else toast(action.ok);
@@ -752,28 +838,39 @@
   }
 
   ITVPlayer.setOnEnded(() => {
+    ITVLog.info('player', 'player:ended emit', { socketConnected: !!socket?.connected });
     if (socket?.connected) socket.emit('player:ended');
+  });
+
+  $('#btn-open-log')?.addEventListener('click', () => {
+    ITVLog.openPopup();
   });
 
   fetch('/health')
     .then((r) => r.json())
     .then((data) => {
+      ITVLog.info('system', 'Health check ok', data);
       if (!data.ok) {
+        ITVLog.warn('system', 'Health check failed', data);
         toast('Server issue — run npm.cmd start', true);
         return;
       }
       if (!data.db && data.phase >= 2) {
+        ITVLog.warn('system', 'Database not connected', data);
         toast('Database not connected — check MONGODB_URI in .env', true);
       }
       if (typeof io === 'undefined') {
+        ITVLog.error('system', 'Socket.io script missing');
         toast('Socket.io script missing — restart server', true);
       }
     })
-    .catch(() => {
+    .catch((err) => {
+      ITVLog.error('system', 'Health check request failed', { message: err?.message || String(err) });
       toast('Server offline — run npm.cmd start', true);
     });
 
   async function init() {
+    ITVLog.initCapture();
     initPlaylistDragDrop();
     initVolumeControl();
 

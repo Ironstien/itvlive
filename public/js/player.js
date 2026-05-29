@@ -10,6 +10,20 @@ const ITVPlayer = (() => {
   let volumeMuted = false;
   const queue = [];
 
+  const YT_STATE_NAMES = {
+    [-1]: 'UNSTARTED',
+    0: 'ENDED',
+    1: 'PLAYING',
+    2: 'PAUSED',
+    3: 'BUFFERING',
+    5: 'CUED',
+  };
+
+  function logPlayer(level, msg, data) {
+    if (typeof ITVLog === 'undefined') return;
+    ITVLog.log(level, 'player', msg, data);
+  }
+
   function syncSignature(payload) {
     if (!payload?.videoId) return 'idle';
     return `${payload.videoId}:${payload.startedAt || 0}`;
@@ -17,6 +31,7 @@ const ITVPlayer = (() => {
 
   function onYouTubeIframeAPIReady() {
     ready = true;
+    logPlayer('info', 'YouTube IFrame API ready');
     queue.forEach((fn) => fn());
     queue.length = 0;
   }
@@ -44,7 +59,16 @@ const ITVPlayer = (() => {
           applyVolume();
         },
         onStateChange(event) {
+          const stateName = YT_STATE_NAMES[event.data] || String(event.data);
+          logPlayer('info', `YT player state: ${stateName}`, {
+            videoId: currentVideoId,
+            stateCode: event.data,
+          });
+          if (event.data === YT.PlayerState.PAUSED) {
+            logPlayer('warn', 'Playback paused', { videoId: currentVideoId });
+          }
           if (event.data === YT.PlayerState.ENDED && onEndedCallback) {
+            logPlayer('info', 'YT ENDED — firing onEnded callback', { videoId: currentVideoId });
             onEndedCallback();
           }
         },
@@ -87,8 +111,15 @@ const ITVPlayer = (() => {
     if (signature === lastSyncSignature) return;
     lastSyncSignature = signature;
 
+    logPlayer('debug', 'ITVPlayer.sync apply', {
+      signature,
+      videoId: payload?.videoId || null,
+      startedAt: payload?.startedAt || null,
+    });
+
     const idleEl = document.getElementById('player-idle');
     if (!payload?.videoId) {
+      logPlayer('info', 'ITVPlayer.sync idle — no video', { previousVideoId: currentVideoId });
       currentVideoId = null;
       if (idleEl) idleEl.classList.remove('hidden');
       whenReady(() => {
@@ -114,6 +145,11 @@ const ITVPlayer = (() => {
         }
 
         if (currentVideoId !== payload.videoId) {
+          logPlayer('info', 'Loading new video', {
+            from: currentVideoId,
+            to: payload.videoId,
+            seekSec,
+          });
           currentVideoId = payload.videoId;
           ytPlayer.loadVideoById(payload.videoId, seekSec);
           return;
@@ -122,9 +158,22 @@ const ITVPlayer = (() => {
         // Same track already loaded — only fix large drift; do not restart playback
         if (typeof ytPlayer.getCurrentTime === 'function') {
           const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
-          if (drift > 12) ytPlayer.seekTo(seekSec, true);
+          if (drift > 12) {
+            logPlayer('warn', 'Seeking to fix drift', {
+              videoId: currentVideoId,
+              driftSec: Math.round(drift),
+              seekSec,
+            });
+            ytPlayer.seekTo(seekSec, true);
+          }
         }
-        if (!isAlreadyPlaying()) ytPlayer.playVideo();
+        if (!isAlreadyPlaying()) {
+          logPlayer('warn', 'Resuming playback — player not playing', {
+            videoId: currentVideoId,
+            seekSec,
+          });
+          ytPlayer.playVideo();
+        }
       };
 
       apply();

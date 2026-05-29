@@ -32,6 +32,14 @@
       <div class="nav-actions">
         <button
           type="button"
+          id="btn-open-log"
+          class="btn-nav-log"
+          title="Open debug log popup — copy events for troubleshooting"
+        >
+          Log
+        </button>
+        <button
+          type="button"
           id="btn-test-users"
           class="btn-test-users"
           aria-pressed="false"
@@ -179,6 +187,7 @@
     </main>
 
     <script src="/js/version.js"></script>
+    <script src="/js/itv-log.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>

@@ -180,6 +180,30 @@ a:hover {
   box-shadow: var(--shadow-glow);
 }
 
+.btn-nav-log {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--void-border);
+  border-radius: var(--radius);
+  background: rgba(20, 18, 28, 0.9);
+  color: var(--grey-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.btn-nav-log:hover {
+  color: #6ecf8a;
+  border-color: rgba(110, 207, 138, 0.55);
+  background: rgba(30, 48, 36, 0.55);
+}
+
 /* —— Main stage grid —— */
 .stage {
   flex: 1;

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>INTO THE VOID — Debug Log</title>
+    <link rel="stylesheet" href="/css/variables.css" />
+    <link rel="stylesheet" href="/css/log.css" />
+  </head>
+  <body class="log-page">
+    <header class="log-toolbar">
+      <div class="log-toolbar__title">
+        <span class="log-toolbar__brand">INTO THE VOID</span>
+        <span class="log-toolbar__subtitle">Debug Log</span>
+      </div>
+      <div class="log-toolbar__actions">
+        <label class="log-toolbar__check">
+          <input type="checkbox" id="log-autoscroll" checked />
+          Auto-scroll
+        </label>
+        <select id="log-filter" class="log-filter" aria-label="Filter by category">
+          <option value="">All categories</option>
+          <option value="playlist">playlist</option>
+          <option value="player">player</option>
+          <option value="socket">socket</option>
+          <option value="queue">queue</option>
+          <option value="room">room</option>
+          <option value="user">user</option>
+          <option value="system">system</option>
+        </select>
+        <button type="button" id="log-copy" class="log-btn log-btn--primary">Copy all</button>
+        <button type="button" id="log-clear" class="log-btn">Clear</button>
+      </div>
+    </header>
+    <div id="log-meta" class="log-meta"></div>
+    <pre id="log-output" class="log-output" aria-live="polite"></pre>
+    <p id="log-status" class="log-status">Waiting for events…</p>
+    <script src="/js/version.js"></script>
+    <script src="/js/itv-log.js"></script>
+    <script src="/js/log-view.js"></script>
+  </body>
+</html>
