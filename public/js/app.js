@@ -276,6 +276,21 @@
     const on = !!state?.testUsersEnabled;
     btn.classList.toggle('is-active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    updateSkipTestTrackButton(state);
+  }
+
+  function isTestUserSocketId(socketId) {
+    return typeof socketId === 'string' && socketId.startsWith('test:');
+  }
+
+  function updateSkipTestTrackButton(state) {
+    const btn = $('#btn-skip-test-track');
+    if (!btn) return;
+    const show =
+      !!state?.testUsersEnabled &&
+      !!state?.nowPlaying &&
+      isTestUserSocketId(state.nowPlaying.socketId);
+    show(btn, show);
   }
 
   function updateQueueButton(state) {
@@ -783,6 +798,17 @@
         return;
       }
       toast(res.enabled ? 'Test users enabled' : 'Test users removed');
+    });
+  });
+
+  $('#btn-skip-test-track')?.addEventListener('click', () => {
+    if (!requireSocket()) return;
+    const btn = $('#btn-skip-test-track');
+    if (btn) btn.disabled = true;
+    socket.emit('dev:testUsers:skip', {}, (res) => {
+      if (btn) btn.disabled = false;
+      if (res?.error) toast(res.error, true);
+      else toast('Skipped test user track');
     });
   });
 

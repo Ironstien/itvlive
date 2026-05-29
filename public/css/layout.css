@@ -177,6 +177,15 @@ a:hover {
   box-shadow: var(--shadow-glow);
 }
 
+.btn-skip-test {
+  color: var(--grey-muted);
+}
+
+.btn-skip-test:not(.hidden):hover {
+  color: #f0a060;
+  border-color: #c07030;
+}
+
 .btn-nav-log {
   padding: 0.28rem 0.55rem;
   border: 1px solid var(--void-border);

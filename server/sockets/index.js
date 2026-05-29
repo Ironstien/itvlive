@@ -2,7 +2,12 @@ const { Server } = require('socket.io');
 const { Room } = require('../services/room');
 const { resolveSocketAuth } = require('../services/socketAuth');
 const { saveUserPlaylist } = require('../services/playlistStore');
-const { toggleTestUsers, isTestUsersEnabled } = require('../services/testUsers');
+const {
+  toggleTestUsers,
+  isTestUsersEnabled,
+  notifyTrackStarted,
+  skipCurrentTestUserTrack,
+} = require('../services/testUsers');
 
 const room = new Room();
 const chatLastSent = new Map();
@@ -25,6 +30,7 @@ function broadcast(io) {
 
 function emitPlayerSync(io) {
   io.emit('player:sync', room.getPlayerSync());
+  notifyTrackStarted(room, () => broadcastRoom(io));
 }
 
 async function handleTrackEnded(io, playlistSyncFor) {
@@ -225,6 +231,24 @@ function registerSockets(httpServer) {
       } catch (err) {
         if (typeof ack === 'function') {
           ack({ error: err.message || 'Failed to toggle test users' });
+        }
+      }
+    });
+
+    socket.on('dev:testUsers:skip', (_payload, ack) => {
+      try {
+        const result = skipCurrentTestUserTrack(room);
+        if (typeof ack === 'function') ack(result);
+        if (result.ok) {
+          if (result.playlistSyncFor) {
+            syncPlaylistFor(io, result.playlistSyncFor);
+          }
+          broadcast(io);
+          emitPlayerSync(io);
+        }
+      } catch (err) {
+        if (typeof ack === 'function') {
+          ack({ error: err.message || 'Failed to skip test user track' });
         }
       }
     });
