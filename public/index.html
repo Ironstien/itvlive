@@ -165,6 +165,9 @@
 
       <section class="stage-center">
         <div class="player-zone">
+          <aside class="current-dj current-dj--avatar" id="current-dj-avatar" aria-label="Current DJ">
+            <p class="current-dj__empty muted">No DJ</p>
+          </aside>
           <div class="player-stack">
             <div class="player-ambient" id="player-ambient" aria-hidden="true">
               <img class="player-ambient__img" id="player-ambient-img" alt="" />
@@ -178,6 +181,9 @@
               </div>
             </div>
           </div>
+          <aside class="current-dj current-dj--stats" id="current-dj-stats" aria-label="Current DJ profile">
+            <p class="current-dj__empty muted">—</p>
+          </aside>
         </div>
 
         <div class="now-playing-block">
@@ -268,7 +274,16 @@
 
       <section class="panel vinyl-pit">
         <div class="panel-header">The Vinyl Pit</div>
-        <div class="panel-body vinyl-pit-body" id="vinyl-pit"></div>
+        <div class="panel-body vinyl-pit-body">
+          <div class="vinyl-pit-row vinyl-pit-row--queue">
+            <span class="vinyl-pit-row__label">DJ Queue</span>
+            <div class="vinyl-pit-row__discs" id="vinyl-pit-queue"></div>
+          </div>
+          <div class="vinyl-pit-row vinyl-pit-row--listeners">
+            <span class="vinyl-pit-row__label">Listening</span>
+            <div class="vinyl-pit-row__discs" id="vinyl-pit-listeners"></div>
+          </div>
+        </div>
       </section>
     </main>
 

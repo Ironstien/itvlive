@@ -155,6 +155,111 @@ async function fetchStoryboard(videoId) {
   return parseStoryboardSpec(html);
 }
 
+const embedCheckCache = new Map();
+
+function parsePlayabilityFromWatchHtml(html) {
+  if (!html) {
+    return { status: null, playableInEmbed: null, unavailable: true };
+  }
+
+  if (html.includes('Visit source') && !html.includes('"playabilityStatus"')) {
+    return { status: 'ERROR', playableInEmbed: false, unavailable: true };
+  }
+
+  const statusMatch = html.match(/"playabilityStatus"\s*:\s*\{[^}]*"status"\s*:\s*"([^"]+)"/);
+  const embedMatch = html.match(/"playableInEmbed"\s*:\s*(true|false)/);
+
+  return {
+    status: statusMatch ? statusMatch[1] : null,
+    playableInEmbed: embedMatch ? embedMatch[1] === 'true' : null,
+    unavailable: false,
+  };
+}
+
+/** Whether a video can play inside the YouTube IFrame player (server-side probe). */
+async function checkYoutubeEmbeddable(videoId) {
+  if (!YOUTUBE_ID_RE.test(videoId)) {
+    return { embeddable: false, videoId, reason: 'invalid_id' };
+  }
+
+  if (embedCheckCache.has(videoId)) {
+    return embedCheckCache.get(videoId);
+  }
+
+  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`;
+
+  let result;
+  try {
+    const [pageRes, oembedRes] = await Promise.all([
+      fetch(watchUrl, { headers: WATCH_HEADERS }),
+      fetch(oembedUrl),
+    ]);
+
+    if (!pageRes.ok) {
+      result = { embeddable: false, videoId, reason: `http_${pageRes.status}` };
+    } else {
+      const html = await pageRes.text();
+      const playability = parsePlayabilityFromWatchHtml(html);
+
+      if (playability.unavailable || playability.status === 'ERROR') {
+        result = { embeddable: false, videoId, reason: 'unavailable' };
+      } else if (playability.status && playability.status !== 'OK') {
+        result = { embeddable: false, videoId, reason: playability.status };
+      } else if (playability.playableInEmbed === false) {
+        result = { embeddable: false, videoId, reason: 'embed_disabled' };
+      } else if (playability.playableInEmbed !== true) {
+        result = { embeddable: false, videoId, reason: 'unknown' };
+      } else {
+        let title = null;
+        let channel = null;
+        if (oembedRes.ok) {
+          const data = await oembedRes.json();
+          title = data.title || null;
+          channel = data.author_name || null;
+        }
+        result = {
+          embeddable: true,
+          videoId,
+          title,
+          channel,
+          duration: parseDurationSeconds(html),
+        };
+      }
+    }
+  } catch (err) {
+    result = { embeddable: false, videoId, reason: err.message || 'fetch_failed' };
+  }
+
+  embedCheckCache.set(videoId, result);
+  return result;
+}
+
+/** Pick the first embeddable candidate for a catalog track definition. */
+async function resolveEmbeddableTrack(track) {
+  if (!track || typeof track !== 'object') return null;
+
+  const candidates = Array.isArray(track.candidates)
+    ? track.candidates
+    : track.videoId
+      ? [track.videoId]
+      : [];
+
+  for (const videoId of candidates) {
+    const check = await checkYoutubeEmbeddable(videoId);
+    if (!check.embeddable) continue;
+
+    return {
+      videoId: check.videoId,
+      title: track.title || check.title || 'Untitled',
+      channel: track.channel || check.channel || null,
+      duration: check.duration ?? track.duration ?? null,
+    };
+  }
+
+  return null;
+}
+
 async function fetchYoutubeMeta(videoId) {
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(watchUrl)}&format=json`;
@@ -188,6 +293,8 @@ module.exports = {
   parseYoutubeId,
   extractPlaylistLineUrl,
   fetchYoutubeMeta,
+  checkYoutubeEmbeddable,
+  resolveEmbeddableTrack,
   youtubeThumbnailUrl,
   fetchStoryboard,
   getStoryboardFrame,

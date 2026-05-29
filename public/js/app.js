@@ -382,24 +382,8 @@
       }
     }
 
-    const pit = $('#vinyl-pit');
-    if (pit) {
-      pit.innerHTML = '';
-      const activeDjId = state.nowPlaying?.socketId || null;
-      (state.users || []).forEach((u) => {
-        const isOnAir = activeDjId != null && u.socketId === activeDjId;
-        const disc = document.createElement('div');
-        disc.className = 'vinyl-user';
-        if (isOnAir) disc.classList.add('vinyl-user--on-air');
-        else if (u.inQueue) disc.classList.add('vinyl-user--queued');
-        disc.tabIndex = 0;
-        disc.innerHTML = buildVinylRecord(u, isOnAir) + buildVinylTooltip(u);
-        pit.appendChild(disc);
-      });
-      if ((state.users || []).length === 0) {
-        pit.innerHTML = '<p class="panel-placeholder">Waiting for listeners…</p>';
-      }
-    }
+    renderCurrentDj(state);
+    renderVinylPit(state);
 
     updateQueueButton(state);
     updateAirSign(state);
@@ -668,8 +652,92 @@
     return parts.join(' · ');
   }
 
+  function createVinylUserEl(u, { isOnAir = false, inQueue = false, isCurrentDj = false } = {}) {
+    const disc = document.createElement('div');
+    disc.className = 'vinyl-user';
+    if (isCurrentDj) disc.classList.add('vinyl-user--current-dj');
+    else if (inQueue) disc.classList.add('vinyl-user--queued');
+    if (!isCurrentDj) disc.tabIndex = 0;
+    disc.innerHTML =
+      buildVinylRecord(u, isOnAir) + (isCurrentDj ? '' : buildVinylTooltip(u, { inQueue }));
+    return disc;
+  }
+
+  function renderVinylRow(container, users, { inQueue = false } = {}) {
+    if (!container) return;
+    container.innerHTML = '';
+    if (!users.length) {
+      container.innerHTML = '<p class="panel-placeholder vinyl-pit-empty">—</p>';
+      return;
+    }
+    users.forEach((u) => {
+      container.appendChild(createVinylUserEl(u, { isOnAir: false, inQueue }));
+    });
+  }
+
+  function renderVinylPit(state) {
+    const queueRow = $('#vinyl-pit-queue');
+    const listenersRow = $('#vinyl-pit-listeners');
+    if (!queueRow || !listenersRow) return;
+
+    const activeDjId = state.nowPlaying?.socketId || null;
+    const userMap = new Map((state.users || []).map((u) => [u.socketId, u]));
+
+    const queuedUsers = (state.globalQueue || [])
+      .filter((e) => e.socketId !== activeDjId)
+      .map((e) => userMap.get(e.socketId))
+      .filter(Boolean);
+
+    const listeners = (state.users || [])
+      .filter((u) => u.socketId !== activeDjId && !u.inQueue)
+      .sort((a, b) => (a.connectedAt || 0) - (b.connectedAt || 0) || a.displayName.localeCompare(b.displayName));
+
+    renderVinylRow(queueRow, queuedUsers, { inQueue: true });
+    renderVinylRow(listenersRow, listeners, { inQueue: false });
+  }
+
+  function buildCurrentDjStats(u, nowPlaying) {
+    const saying = u.customSaying
+      ? `<p class="current-dj-stats__saying">"${escapeHtml(u.customSaying)}"</p>`
+      : '';
+    const badges = (u.badges || []).length
+      ? `<p class="current-dj-stats__badges">${(u.badges || []).map((b) => escapeHtml(b)).join(' · ')}</p>`
+      : '';
+    const track = nowPlaying?.title
+      ? `<p class="current-dj-stats__track"><strong>Now:</strong> ${escapeHtml(nowPlaying.title)}</p>`
+      : '';
+    return `
+      <div class="current-dj-stats">
+        <h3 class="current-dj-stats__name">${escapeHtml(u.displayName)}</h3>
+        <p class="current-dj-stats__rank">${escapeHtml(buildVinylRankLine(u))}</p>
+        ${saying}
+        ${badges}
+        ${track}
+      </div>
+    `;
+  }
+
+  function renderCurrentDj(state) {
+    const avatarEl = $('#current-dj-avatar');
+    const statsEl = $('#current-dj-stats');
+    if (!avatarEl || !statsEl) return;
+
+    const activeDjId = state.nowPlaying?.socketId || null;
+    const dj = activeDjId ? (state.users || []).find((u) => u.socketId === activeDjId) : null;
+
+    if (!dj || !state.nowPlaying) {
+      avatarEl.innerHTML = '<p class="current-dj__empty muted">No DJ</p>';
+      statsEl.innerHTML = '<p class="current-dj__empty muted">—</p>';
+      return;
+    }
+
+    avatarEl.innerHTML = '';
+    avatarEl.appendChild(createVinylUserEl(dj, { isOnAir: true, isCurrentDj: true }));
+    statsEl.innerHTML = buildCurrentDjStats(dj, state.nowPlaying);
+  }
+
   function buildVinylRecord(u, isOnAir = false) {
-    const spinClass = isOnAir ? ' vinyl-record--spinning' : '';
+    const spinClass = isOnAir ? ' vinyl-record--spinning vinyl-record--on-air' : '';
     const labelContent = u.avatarUrl
       ? `<img class="vinyl-record__avatar" src="${escapeHtml(u.avatarUrl)}" alt="" loading="lazy" />`
       : `<span class="vinyl-record__initial" aria-hidden="true">${escapeHtml((u.displayName || '?').charAt(0).toUpperCase())}</span>`;
@@ -683,14 +751,14 @@
     `;
   }
 
-  function buildVinylTooltip(u) {
+  function buildVinylTooltip(u, { inQueue = false } = {}) {
     const saying = u.customSaying
       ? `<p class="vinyl-tooltip__saying">${escapeHtml(u.customSaying)}</p>`
       : '';
     const badges = (u.badges || []).length
       ? `<p class="vinyl-tooltip__badges">${(u.badges || []).map((b) => escapeHtml(b)).join(' · ')}</p>`
       : '';
-    const queueHint = u.inQueue ? '<p class="vinyl-tooltip__queue">In DJ queue</p>' : '';
+    const queueHint = inQueue ? '<p class="vinyl-tooltip__queue">In DJ queue</p>' : '';
     return `
       <div class="vinyl-tooltip" role="tooltip">
         <p class="vinyl-tooltip__name">${escapeHtml(u.displayName)}</p>
@@ -796,6 +864,7 @@
     if (!requireSocket()) return;
     const btn = $('#btn-test-users');
     if (btn) btn.disabled = true;
+    toast('Validating test tracks…');
     socket.emit('dev:testUsers:toggle', {}, (res) => {
       if (btn) btn.disabled = false;
       if (res?.error) {

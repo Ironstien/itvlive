@@ -45,6 +45,7 @@ class Room {
       badges: Array.isArray(account.badges) ? [...account.badges] : [],
       role: staffRole === 'admin' ? 'admin' : 'user',
       inQueue: false,
+      connectedAt: Date.now(),
     });
     if (!this.playlists.has(socketId)) {
       this.playlists.set(socketId, []);
@@ -492,6 +493,7 @@ class Room {
         staffRole: u.staffRole ?? null,
         badges: Array.isArray(u.badges) ? u.badges : [],
         inQueue: u.inQueue,
+        connectedAt: u.connectedAt ?? null,
       })),
       chat: [...this.chat],
       testUsersEnabled: isTestUsersEnabled(),

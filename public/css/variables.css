@@ -22,17 +22,21 @@
   --vinyl-pit-header-height: 1.75rem;
   --vinyl-pit-inset: 0.45rem;
   --vinyl-pit-row-gap: 0.35rem;
+  --vinyl-pit-label-height: 0.85rem;
   --vinyl-disc-max: 66px;
   --vinyl-disc-size: min(
     var(--vinyl-disc-max),
     calc(
       (
         var(--vinyl-pit-height) - var(--vinyl-pit-header-height) -
-          (var(--vinyl-pit-inset) * 2) - var(--vinyl-pit-row-gap) - 8px
+          (var(--vinyl-pit-inset) * 2) - (var(--vinyl-pit-label-height) * 2) -
+          (var(--vinyl-pit-row-gap) * 2) - 6px
       ) / 2
     )
   );
   --vinyl-label-ratio: 0.42;
+  --current-dj-disc-size: 88px;
+  --current-dj-stats-width: 118px;
   --player-max-width: 420px;
   --player-max-height: 236px;
   --void-bg-base: #030304;
