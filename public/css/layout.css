@@ -354,12 +354,14 @@ a:hover {
   min-height: 0;
   min-width: 0;
   grid-row: 2;
-  height: var(--player-video-height);
 }
 
 .current-dj--avatar {
   grid-column: 1;
+  grid-row: 1 / -1;
   justify-content: flex-end;
+  align-self: stretch;
+  height: 100%;
 }
 
 .current-dj--stats {
@@ -367,6 +369,7 @@ a:hover {
   justify-content: flex-start;
   align-items: stretch;
   width: 100%;
+  height: var(--player-video-height);
 }
 
 .player-stage__slot {
@@ -471,9 +474,10 @@ a:hover {
 
 .vinyl-user--current-dj {
   flex-shrink: 0;
-  width: var(--player-video-height);
-  height: var(--player-video-height);
+  height: 100%;
+  width: auto;
   max-width: 100%;
+  max-height: 100%;
   min-width: var(--current-dj-disc-min);
   min-height: var(--current-dj-disc-min);
   aspect-ratio: 1 / 1;
@@ -786,13 +790,16 @@ a:hover {
   }
 
   .current-dj--avatar {
+    grid-row: auto;
     justify-content: center;
     height: auto;
+    align-self: center;
   }
 
   .vinyl-user--current-dj {
     width: min(var(--player-video-height), 100%);
     height: min(var(--player-video-height), 100%);
+    max-height: none;
   }
 
   .current-dj--stats {
