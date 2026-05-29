@@ -23,7 +23,7 @@
       <button type="button" class="site-overlay__backdrop" aria-label="Close" data-overlay-close></button>
       <div class="site-overlay__dialog">
         <div id="overlay-home" class="overlay-panel auth-card hidden" role="dialog" aria-labelledby="overlay-home-title">
-          <h1 id="overlay-home-title">Welcome to the void</h1>
+          <h1 id="overlay-home-title">INTO THE VOID</h1>
           <p class="tagline">Drop in, queue a track, and vibe with the room.</p>
           <p>
             A community music room: shared queue, live chat, voting, and the Vinyl Pit.
@@ -96,16 +96,9 @@
     </div>
 
     <header class="site-nav">
-      <div class="site-logo">
-        <img
-          src="/img/itv-logo.png"
-          alt="Into The Void Live"
-          class="site-logo-img"
-          width="852"
-          height="151"
-          decoding="async"
-        />
-      </div>
+      <a href="/index.html" class="site-brand" aria-label="INTO THE VOID — Main Stage">
+        <span class="site-brand-name">ITV</span>
+      </a>
       <ul class="nav-links">
         <li><button type="button" class="nav-link" data-overlay="home">Home</button></li>
         <li><button type="button" class="nav-link" data-overlay="about">About Us</button></li>
@@ -178,6 +171,7 @@
             <div class="player-wrap">
               <div id="yt-player"></div>
               <div id="player-idle" class="player-idle">
+                <p class="player-idle__brand">INTO THE VOID</p>
                 <p>No track playing</p>
                 <p><small>Add songs and join the DJ queue</small></p>
               </div>

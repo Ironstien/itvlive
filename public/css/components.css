@@ -385,6 +385,16 @@
   z-index: 1;
 }
 
+.player-idle__brand {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: var(--brand-letter-spacing);
+  text-transform: uppercase;
+  color: var(--purple-dim);
+  text-shadow: var(--brand-glow);
+}
+
 .player-ambient {
   position: absolute;
   z-index: 0;

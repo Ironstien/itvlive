@@ -80,7 +80,7 @@ a:hover {
   text-decoration: underline;
 }
 
-/* —— Nav (compact — height driven by logo) —— */
+/* —— Nav (compact — height driven by brand text) —— */
 .site-nav {
   flex-shrink: 0;
   display: flex;
@@ -93,19 +93,25 @@ a:hover {
   border-bottom: 1px solid var(--void-border);
 }
 
-.site-logo {
+.site-brand {
   display: flex;
   align-items: center;
+  gap: 0.4rem;
   flex-shrink: 0;
-  line-height: 0;
+  text-decoration: none;
+  color: var(--grey-text);
 }
 
-.site-logo-img {
-  display: block;
-  height: 24px;
-  width: auto;
-  max-width: min(38vw, 180px);
-  object-fit: contain;
+.site-brand:hover {
+  color: var(--purple-bright);
+  text-decoration: none;
+}
+
+.site-brand-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: var(--brand-letter-spacing);
+  text-transform: uppercase;
 }
 
 .nav-links {
