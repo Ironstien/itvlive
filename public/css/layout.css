@@ -340,7 +340,7 @@ a:hover {
     minmax(var(--player-stage-gap-min), 1fr)
     auto
     minmax(var(--player-stage-gap-min), 1fr);
-  align-items: center;
+  align-items: stretch;
   column-gap: var(--player-flank-gap);
   padding: 0.25rem 0;
   position: relative;
@@ -350,24 +350,26 @@ a:hover {
 
 .current-dj {
   display: flex;
-  align-items: center;
   min-height: 0;
   min-width: 0;
-  grid-row: 2;
 }
 
 .current-dj--avatar {
   grid-column: 1;
   grid-row: 1 / -1;
   justify-content: flex-end;
+  align-items: center;
   align-self: stretch;
-  height: 100%;
+  container-type: size;
+  container-name: dj-avatar-slot;
 }
 
 .current-dj--stats {
   grid-column: 3;
+  grid-row: 2;
   justify-content: flex-start;
   align-items: stretch;
+  align-self: center;
   width: 100%;
   height: var(--player-video-height);
 }
@@ -472,27 +474,26 @@ a:hover {
   font-weight: 600;
 }
 
-.vinyl-user--current-dj {
-  flex-shrink: 0;
-  height: 100%;
-  width: auto;
-  max-width: 100%;
-  max-height: 100%;
+.current-dj--avatar .vinyl-user--current-dj {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
   min-width: var(--current-dj-disc-min);
   min-height: var(--current-dj-disc-min);
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 1 / 1;
 }
 
-.vinyl-user--current-dj .vinyl-record__label {
+.current-dj--avatar .vinyl-user--current-dj .vinyl-record__label {
   width: calc(var(--vinyl-label-ratio) * 100%);
   height: calc(var(--vinyl-label-ratio) * 100%);
 }
 
-.vinyl-user--current-dj .vinyl-record__initial {
+.current-dj--avatar .vinyl-user--current-dj .vinyl-record__initial {
   font-size: 18%;
 }
 
-.vinyl-user--current-dj .vinyl-record__spindle {
+.current-dj--avatar .vinyl-user--current-dj .vinyl-record__spindle {
   width: calc(var(--vinyl-label-ratio) * 12%);
   height: calc(var(--vinyl-label-ratio) * 12%);
 }
@@ -796,10 +797,10 @@ a:hover {
     align-self: center;
   }
 
-  .vinyl-user--current-dj {
+  .current-dj--avatar .vinyl-user--current-dj {
     width: min(var(--player-video-height), 100%);
     height: min(var(--player-video-height), 100%);
-    max-height: none;
+    container-type: normal;
   }
 
   .current-dj--stats {

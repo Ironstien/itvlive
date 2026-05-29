@@ -520,7 +520,7 @@
   align-self: center;
 }
 
-.vinyl-user {
+.vinyl-user:not(.vinyl-user--current-dj) {
   position: relative;
   flex: 0 0 var(--vinyl-disc-size);
   width: var(--vinyl-disc-size);
@@ -532,6 +532,15 @@
   align-items: center;
   justify-content: center;
   outline: none;
+}
+
+.vinyl-user--current-dj {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  flex: 0 0 auto;
 }
 
 .vinyl-user--queued .vinyl-record {
