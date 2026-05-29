@@ -452,6 +452,7 @@ a:hover {
   height: var(--player-video-height);
   max-width: 100%;
   aspect-ratio: 16 / 9;
+  overflow: visible;
 }
 
 .current-dj-stats__name {
@@ -641,6 +642,42 @@ a:hover {
 .btn-skip-test:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.effect-block {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--void-deep);
+  border-radius: var(--radius);
+  border: 1px solid var(--void-border);
+}
+
+.effect-block label {
+  font-size: 0.65rem;
+  color: var(--grey-muted);
+  white-space: nowrap;
+  margin: 0;
+}
+
+.effect-block select {
+  min-width: 6.5rem;
+  max-width: 8.5rem;
+  padding: 0.15rem 0.35rem;
+  background: var(--void-panel);
+  border: 1px solid var(--void-border);
+  border-radius: 4px;
+  color: var(--grey-text);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.effect-block select:hover,
+.effect-block select:focus {
+  border-color: var(--purple-mid);
+  outline: none;
 }
 
 .vote-block {

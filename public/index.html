@@ -169,7 +169,7 @@
             <p class="current-dj__empty muted">No DJ</p>
           </aside>
           <div class="player-stage__slot player-stage__slot--above" aria-hidden="true"></div>
-          <div class="player-stack">
+          <div class="player-stack" id="player-stack" data-effect="1">
             <div class="player-ambient" id="player-ambient" aria-hidden="true">
               <img class="player-ambient__img" id="player-ambient-img" alt="" />
             </div>
@@ -232,6 +232,17 @@
             >
               Skip Track
             </button>
+
+            <div class="effect-block">
+              <label for="player-effect-select">Effect</label>
+              <select id="player-effect-select" aria-label="Video player effect">
+                <option value="1">Soft Aura</option>
+                <option value="2">Solid Ring</option>
+                <option value="3">Neon Void</option>
+                <option value="4">Pulse</option>
+                <option value="5">Vignette</option>
+              </select>
+            </div>
 
             <div class="vote-block">
               <label for="vote-slider">Vote (1–100)</label>
@@ -298,6 +309,7 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="/js/player.js"></script>
     <script src="/js/ambient.js"></script>
+    <script src="/js/player-effects.js"></script>
     <script src="/js/app.js"></script>
   </body>
 </html>

@@ -1006,6 +1006,7 @@
     ITVLog.initCapture();
     initPlaylistDragDrop();
     initVolumeControl();
+    ITVPlayerEffects.init();
     initOverlays();
 
     const user = await ITVAuth.fetchMe();

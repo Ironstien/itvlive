@@ -412,8 +412,158 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* —— Video player effects (data-effect on .player-stack) —— */
+
+/* 1 — Soft Aura: blurred thumbnail halo (default) */
+.player-stack[data-effect='1'] .player-ambient__img {
   filter: blur(48px) saturate(1.35) brightness(0.9);
   opacity: 0.55;
+}
+
+/* 2 — Solid Ring: ~20px near-solid band, extended fade */
+.player-stack[data-effect='2'] {
+  --halo-ext: 88px;
+  --halo-solid: 20px;
+  --halo-fade: calc(var(--halo-ext) - var(--halo-solid));
+}
+
+.player-stack[data-effect='2'] .player-ambient {
+  inset: calc(-1 * var(--halo-ext));
+}
+
+.player-stack[data-effect='2'] .player-ambient__img {
+  filter: blur(5px) saturate(1.7) brightness(1.05);
+  opacity: 1;
+  -webkit-mask-image:
+    linear-gradient(
+      to right,
+      transparent 0,
+      black var(--halo-fade),
+      black var(--halo-ext),
+      transparent var(--halo-ext),
+      transparent calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-fade)),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      black var(--halo-fade),
+      black var(--halo-ext),
+      transparent var(--halo-ext),
+      transparent calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-fade)),
+      transparent 100%
+    );
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(
+      to right,
+      transparent 0,
+      black var(--halo-fade),
+      black var(--halo-ext),
+      transparent var(--halo-ext),
+      transparent calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-fade)),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      black var(--halo-fade),
+      black var(--halo-ext),
+      transparent var(--halo-ext),
+      transparent calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-ext)),
+      black calc(100% - var(--halo-fade)),
+      transparent 100%
+    );
+  mask-composite: intersect;
+}
+
+/* 3 — Neon Void: brand purple / flame glow (no thumbnail) */
+.player-stack[data-effect='3'] .player-ambient {
+  opacity: 0 !important;
+}
+
+.player-stack[data-effect='3']:has(.player-ambient.is-active)::before {
+  content: '';
+  position: absolute;
+  inset: -52px;
+  border-radius: calc(var(--radius) + 10px);
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 72% 68% at 50% 50%, rgba(155, 93, 229, 0.42) 0%, transparent 62%),
+    radial-gradient(ellipse 90% 80% at 50% 55%, rgba(255, 107, 53, 0.14) 0%, transparent 70%);
+  box-shadow:
+    0 0 36px rgba(155, 93, 229, 0.38),
+    0 0 72px rgba(123, 44, 191, 0.22),
+    0 0 120px rgba(90, 24, 154, 0.12);
+}
+
+/* 4 — Pulse: breathing thumbnail glow */
+.player-stack[data-effect='4'] .player-ambient {
+  inset: -36px;
+}
+
+.player-stack[data-effect='4'] .player-ambient__img {
+  filter: blur(40px) saturate(1.45) brightness(0.95);
+  opacity: 0.55;
+  animation: player-effect-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes player-effect-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    filter: blur(36px) saturate(1.3) brightness(0.9);
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.82;
+    filter: blur(58px) saturate(1.65) brightness(1.05);
+    transform: scale(1.035);
+  }
+}
+
+/* 5 — Vignette: cinematic inset frame with soft colour wash */
+.player-stack[data-effect='5'] .player-ambient {
+  inset: -28px;
+}
+
+.player-stack[data-effect='5'] .player-ambient__img {
+  filter: blur(28px) saturate(1.15) brightness(0.72);
+  opacity: 0.65;
+  -webkit-mask-image: radial-gradient(ellipse 88% 84% at center, black 22%, transparent 72%);
+  mask-image: radial-gradient(ellipse 88% 84% at center, black 22%, transparent 72%);
+}
+
+.player-stack[data-effect='5'] .player-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow:
+    inset 0 0 56px rgba(0, 0, 0, 0.88),
+    inset 0 0 18px rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-stack[data-effect='4'] .player-ambient__img {
+    animation: none;
+    opacity: 0.55;
+    filter: blur(44px) saturate(1.4) brightness(0.92);
+    transform: none;
+  }
 }
 
 #yt-player {
