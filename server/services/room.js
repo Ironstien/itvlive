@@ -1,4 +1,9 @@
-const { parseYoutubeId, fetchYoutubeMeta, youtubeThumbnailUrl } = require('./youtube');
+const {
+  parseYoutubeId,
+  extractPlaylistLineUrl,
+  fetchYoutubeMeta,
+  youtubeThumbnailUrl,
+} = require('./youtube');
 const { can, ACTIONS } = require('../config/permissions');
 const { isTestUsersEnabled } = require('./testUsers');
 
@@ -191,7 +196,7 @@ class Room {
     let failed = 0;
 
     for (const line of lines) {
-      const videoId = parseYoutubeId(line);
+      const videoId = parseYoutubeId(extractPlaylistLineUrl(line));
       if (!videoId) {
         failed += 1;
         continue;

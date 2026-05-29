@@ -328,16 +328,24 @@
       return;
     }
 
-    const lines = myPlaylist.map((item) => youtubeWatchUrl(item.videoId));
-    const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
     const date = new Date().toISOString().slice(0, 10);
+    const header = [
+      `# ITV Playlist — exported ${date}`,
+      '# Format: Title https://www.youtube.com/watch?v=...',
+      '',
+    ];
+    const songs = myPlaylist.map(
+      (item) => `${item.title || 'Untitled'} ${youtubeWatchUrl(item.videoId)}`
+    );
+    const content = [...header, ...songs].join('\n') + '\n';
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `itv-playlist-${date}.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
-    toast(`Exported ${lines.length} song${lines.length === 1 ? '' : 's'}`);
+    toast(`Exported ${songs.length} song${songs.length === 1 ? '' : 's'}`);
   }
 
   function parsePlaylistImportText(text) {
@@ -361,7 +369,7 @@
 
     const urls = parsePlaylistImportText(text);
     if (!urls.length) {
-      toast('No YouTube URLs found in file', true);
+      toast('No songs found in file', true);
       return;
     }
 

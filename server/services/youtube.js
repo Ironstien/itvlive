@@ -31,6 +31,14 @@ function parseYoutubeId(input) {
   return null;
 }
 
+/** Pull a URL from a playlist line (`Title https://…`) or return the whole line. */
+function extractPlaylistLineUrl(line) {
+  if (!line || typeof line !== 'string') return '';
+  const trimmed = line.trim();
+  const urlMatch = trimmed.match(/https?:\/\/[^\s]+/i);
+  return urlMatch ? urlMatch[0] : trimmed;
+}
+
 function youtubeThumbnailUrl(videoId) {
   return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 }
@@ -178,6 +186,7 @@ async function fetchYoutubeMeta(videoId) {
 
 module.exports = {
   parseYoutubeId,
+  extractPlaylistLineUrl,
   fetchYoutubeMeta,
   youtubeThumbnailUrl,
   fetchStoryboard,
