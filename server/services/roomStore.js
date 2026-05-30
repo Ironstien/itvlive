@@ -1,6 +1,7 @@
 const { isDbConnected } = require('../config/db');
 const RoomSnapshot = require('../models/RoomSnapshot');
 const { isTestUsersEnabled, setTestUsersEnabled } = require('./testUsers');
+const { getBootMeta } = require('./serverBoot');
 
 const SNAPSHOT_KEY = 'live';
 const SAVE_DEBOUNCE_MS = 400;
@@ -120,7 +121,10 @@ async function hydrateRoom(room) {
 
   room.hydrateFromSnapshot(snapshot);
   setTestUsersEnabled(snapshot.testUsersEnabled);
-  room.recoverExpiredTrack();
+  const { bootedAt } = getBootMeta();
+  if (room.reconcilePlaybackAfterBoot(bootedAt)) {
+    console.log('[room] Playback clock reconciled after server boot');
+  }
 
   const np = room.nowPlaying;
   console.log(

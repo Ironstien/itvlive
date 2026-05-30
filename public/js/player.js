@@ -110,13 +110,15 @@ const ITVPlayer = (() => {
 
     if (!payload?.videoId) return 'idle';
 
+    const bootPrefix = payload.bootId ? `${payload.bootId}:` : '';
+
     if (payload.playbackSessionId) {
 
-      return `${payload.videoId}:${payload.playbackSessionId}`;
+      return `${bootPrefix}${payload.videoId}:${payload.playbackSessionId}`;
 
     }
 
-    return `${payload.videoId}:${payload.startedAt || 0}`;
+    return `${bootPrefix}${payload.videoId}:${payload.startedAt || 0}`;
 
   }
 
@@ -138,11 +140,51 @@ const ITVPlayer = (() => {
 
 
 
+  function clampSeekSec(seekSec, payload) {
+
+    let sec = Math.max(0, Math.floor(seekSec));
+
+    const metaDur = Number(payload?.durationSec);
+
+    if (Number.isFinite(metaDur) && metaDur > 0) {
+
+      sec = Math.min(sec, Math.max(0, Math.floor(metaDur) - 1));
+
+    }
+
+    if (ytPlayer?.getDuration) {
+
+      const ytDur = ytPlayer.getDuration();
+
+      if (Number.isFinite(ytDur) && ytDur > 1) {
+
+        sec = Math.min(sec, Math.max(0, Math.floor(ytDur) - 1));
+
+      }
+
+    }
+
+    return sec;
+
+  }
+
+
+
+  function resolveSeekSec(payload) {
+
+    if (!payload?.startedAt) return 0;
+
+    return clampSeekSec(computeSeekSec(payload), payload);
+
+  }
+
+
+
   function getServerSeekSec() {
 
     if (!lastSyncPayload?.startedAt) return 0;
 
-    return Math.max(0, Math.floor((serverNowMs() - lastSyncPayload.startedAt) / 1000));
+    return resolveSeekSec(lastSyncPayload);
 
   }
 
@@ -234,23 +276,25 @@ const ITVPlayer = (() => {
 
 
 
-      const seekSec = computeSeekSec(lastSyncPayload);
+      const seekSec = resolveSeekSec(lastSyncPayload);
 
-      const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
+      const ytTime = ytPlayer.getCurrentTime();
+
+      const drift = Math.abs(ytTime - seekSec);
 
       if (drift > RESYNC_DRIFT_SEC) {
 
-        logPlayer('warn', 'Drift exceeds resync threshold', { drift, seekSec });
+        logPlayer('warn', 'Drift exceeds resync threshold', { drift, seekSec, ytTime });
 
-        seekIfNeeded(seekSec);
+        // Stale server clock: do not hammer seekTo far ahead of actual playback.
 
-        if (
+        if (seekSec <= ytTime + RESYNC_DRIFT_SEC + 30) {
 
-          ytPlayer?.getCurrentTime &&
+          seekIfNeeded(seekSec);
 
-          Math.abs(ytPlayer.getCurrentTime() - seekSec) > RESYNC_DRIFT_SEC
+        }
 
-        ) {
+        if (Math.abs(ytPlayer.getCurrentTime() - seekSec) > RESYNC_DRIFT_SEC) {
 
           onResyncRequestCallback?.();
 
@@ -358,11 +402,13 @@ const ITVPlayer = (() => {
 
     if (!ytPlayer?.seekTo || !ytPlayer?.getCurrentTime) return;
 
-    const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
+    const target = clampSeekSec(seekSec, lastSyncPayload);
+
+    const drift = Math.abs(ytPlayer.getCurrentTime() - target);
 
     if (drift > SEEK_DRIFT_SEC) {
 
-      ytPlayer.seekTo(seekSec, true);
+      ytPlayer.seekTo(target, true);
 
     }
 
@@ -490,7 +536,7 @@ const ITVPlayer = (() => {
 
 
 
-    const seekSec = computeSeekSec(payload);
+    const seekSec = resolveSeekSec(payload);
 
     whenReady(() => {
 
@@ -656,9 +702,17 @@ const ITVPlayer = (() => {
 
               autoplayMuteTrick = false;
 
-              autoplayLockedMuted = true;
+              if (!volumeMuted && volumeLevel > 0) {
 
-              ytPlayer.mute?.();
+                releaseAutoplayMuteLock();
+
+              } else {
+
+                autoplayLockedMuted = true;
+
+                ytPlayer.mute?.();
+
+              }
 
             } else {
 
@@ -774,7 +828,7 @@ const ITVPlayer = (() => {
 
     const signature = syncSignature(payload);
 
-    const seekSec = payload?.videoId ? computeSeekSec(payload) : 0;
+    const seekSec = payload?.videoId ? resolveSeekSec(payload) : 0;
 
 
 
@@ -783,7 +837,7 @@ const ITVPlayer = (() => {
       if (payload?.videoId && payload.isPlaying !== false) {
         updateClockOffset(payload);
         lastSyncPayload = { ...lastSyncPayload, ...payload };
-        const freshSeekSec = computeSeekSec(payload);
+        const freshSeekSec = resolveSeekSec(payload);
         seekIfNeeded(freshSeekSec);
         if (!isAlreadyPlaying()) {
           ensurePlaying(freshSeekSec, 'duplicate-sync');
@@ -906,7 +960,7 @@ const ITVPlayer = (() => {
 
   function userPlay() {
 
-    const seekSec = lastSyncPayload ? computeSeekSec(lastSyncPayload) : 0;
+    const seekSec = lastSyncPayload ? resolveSeekSec(lastSyncPayload) : 0;
 
     whenReady(() => {
 

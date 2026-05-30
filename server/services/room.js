@@ -893,6 +893,27 @@ class Room {
     return advanced;
   }
 
+  /**
+   * After a process restart, persisted startedAt is from before boot — clients would
+   * seek hundreds of seconds ahead while the iframe stays near 0. Reset the clock.
+   */
+  reconcilePlaybackAfterBoot(bootedAt) {
+    const advanced = this.recoverExpiredTrack();
+    if (!this.nowPlaying || !Number.isFinite(bootedAt)) {
+      return advanced > 0;
+    }
+
+    if (this.nowPlaying.startedAt >= bootedAt) {
+      return advanced > 0;
+    }
+
+    this.nowPlaying.startedAt = Date.now();
+    this.nowPlaying.playbackSessionId = this._newPlaybackSessionId();
+    this.nowPlaying.playSessionId = null;
+    this._scheduleTrackEndTimer();
+    return true;
+  }
+
   _playbackPayloadBase() {
     const serverTime = Date.now();
     if (!this.nowPlaying) {
