@@ -107,13 +107,14 @@ On server restart, live room state may reset — that is acceptable for MVP; do 
 4. **No secrets in git** — `.env` only; document vars in `.env.example`.
 5. **Never store plain passwords** — `passwordHash` (bcrypt) only.
 6. **YouTube constraints** — some videos block embed; metadata scraping is fragile; prefer official Data API when added. Do not download/re-host YouTube audio.
-7. **Player sync** — `player:sync` drives the YouTube iframe; `room:state` must **not** reload the player on every chat update.
-8. **Track end** — prefer server timer (`duration` + `startedAt`); `player:ended` is backup only; prevent double-advance.
+7. **Player sync** — `player:sync` drives the YouTube iframe; `room:state` must **not** reload the player on every chat update. **One seek per track boundary**: late join seeks once to `serverTime - startedAt`; track change loads new video at 0. **No** drift loop, `player:tick`, or periodic resync during playback.
+8. **Track end** — **current DJ** client `player:ended` advances the queue; server timer (`duration` + `startedAt`) is backup if DJ disconnects; prevent double-advance.
+9. **Queue** — users are listeners until `queue:join`; first DJ in empty queue starts playlist head; rotation on track end.
 
 ## Known risks (do not ignore)
 
 - YouTube ToS / embed restrictions may break tracks or the project long-term.
-- Perfect A/V sync across all clients is **not** achievable — ~12s drift correction is normal.
+- Listeners may drift from each other mid-song; align at join and at each track change — do not add ongoing drift correction without explicit request.
 - WebRTC mic + YouTube ducking is **Phase 5** — complex; do not half-implement in earlier phases.
 - Vinyl Pit animations: throttle on mobile; cap animated discs if performance drops.
 

@@ -13,7 +13,6 @@ const MAX_MESSAGE_LEN = 280;
 /** Legacy fallback — unknown durations no longer auto-advance on a timer. */
 const DEFAULT_TRACK_DURATION_SEC = 600;
 const TRACK_END_MIN_ELAPSED_RATIO = 0.8;
-const TRACK_END_NEAR_SEC = 8;
 
 class Room {
   constructor() {
@@ -618,21 +617,15 @@ class Room {
 
     const userId = this.getUserId(socketId);
     const isCurrentDj = np.userId === userId || np.socketId === socketId;
+    if (!isCurrentDj) {
+      return { ok: false, reason: 'not_current_dj' };
+    }
+
     const elapsedSec = (Date.now() - np.startedAt) / 1000;
     const durationSec = this._knownDurationSec(np.durationSec);
 
-    if (durationSec != null) {
-      if (elapsedSec < durationSec * TRACK_END_MIN_ELAPSED_RATIO) {
-        return { ok: false, reason: 'too_early' };
-      }
-      const nearEndSec = Math.min(TRACK_END_NEAR_SEC, durationSec * 0.05);
-      const nearEnd =
-        elapsedSec >= durationSec - nearEndSec || elapsedSec >= durationSec * 0.95;
-      if (!nearEnd && !isCurrentDj) {
-        return { ok: false, reason: 'not_near_end' };
-      }
-    } else if (!isCurrentDj) {
-      return { ok: false, reason: 'unknown_duration_not_dj' };
+    if (durationSec != null && elapsedSec < durationSec * TRACK_END_MIN_ELAPSED_RATIO) {
+      return { ok: false, reason: 'too_early' };
     }
 
     return { ok: true };

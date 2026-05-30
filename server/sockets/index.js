@@ -358,11 +358,7 @@ function emitPlayerSync(io) {
 
   scheduleRoomSave(room);
 
-  if (room.nowPlaying) {
-    startPlayerTick(io);
-  } else {
-    stopPlayerTick();
-  }
+  stopPlayerTick();
 
 }
 
@@ -1115,8 +1111,6 @@ async function initRoomFromStore() {
     }
 
     notifyTrackStarted(room, ioRef ? () => broadcastRoom(ioRef) : null);
-
-    if (ioRef) startPlayerTick(ioRef);
 
   }
 

@@ -149,8 +149,9 @@ Return shapes from mutations: `{ ok: true, ... }` or `{ error: 'message' }` — 
 ## Player client (`public/js/player.js`)
 
 - Global `ITVPlayer` IIFE wrapping YT IFrame API.
-- `sync(payload)` — signature `videoId:startedAt`; seek using `serverTime - startedAt`; drift **> 5s**; do not restart same track unnecessarily.
-- `setOnEnded(fn)` — backup end detection; server timer is primary (Phase 0+).
+- `sync(payload)` — signature `bootId:videoId:playbackSessionId`; seek once on new signature (late join offset or new track at 0). Duplicate signature: update payload only, no seek/play.
+- `setOnEnded(fn)` — **current DJ only**; server timer is backup if DJ gone.
+- No `player:tick`, drift loop, or automatic late-join resync.
 
 ## Mongoose models (target schema)
 

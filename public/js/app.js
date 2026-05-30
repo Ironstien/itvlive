@@ -196,6 +196,17 @@
     renderPlaylist(myPlaylist);
   }
 
+  function isCurrentDjFromNowPlaying(np) {
+    if (!np?.videoId) return false;
+    if (loggedInUser?.userId) return String(np.userId) === String(loggedInUser.userId);
+    return np.socketId === mySocketId;
+  }
+
+  function updatePlayerDjRole(stateOrNp) {
+    const np = stateOrNp?.nowPlaying ?? stateOrNp;
+    ITVPlayer.setIsCurrentDj?.(isCurrentDjFromNowPlaying(np));
+  }
+
   function rememberBootId(bootId) {
     if (!bootId) return;
     if (lastKnownBootId && lastKnownBootId !== bootId) {
@@ -248,29 +259,15 @@
     ITVPlayer.sync(payload);
     ITVAmbient.sync(payload, () => ITVPlayer.getServerSeekSec?.() ?? ITVPlayer.getCurrentTime());
     updateDjBanner(payload);
+    updatePlayerDjRole({
+      videoId: payload?.videoId,
+      userId: payload?.userId,
+      socketId: roomState?.nowPlaying?.socketId,
+    });
     if (pendingUserPlay) {
       pendingUserPlay = false;
       ITVPlayer.userPlay?.();
     }
-  }
-
-  function handlePlayerTick(payload) {
-    if (!payload?.videoId) return;
-    ITVPlayer.applyPlaybackHeartbeat?.(payload);
-    ITVAmbient.sync(
-      { ...lastSyncPayloadFromTick(payload), videoId: payload.videoId },
-      () => ITVPlayer.getServerSeekSec?.() ?? ITVPlayer.getCurrentTime()
-    );
-  }
-
-  function lastSyncPayloadFromTick(payload) {
-    return {
-      videoId: payload.videoId,
-      startedAt: payload.startedAt,
-      serverTime: payload.serverTime,
-      playbackSessionId: payload.playbackSessionId,
-      isPlaying: true,
-    };
   }
 
   async function fetchSavedPlaylist() {
@@ -336,13 +333,6 @@
       if (reconnected) {
         toast('Reconnected — syncing room', false);
         socket.emit('room:requestSync');
-      } else {
-        // Late join: YT iframe may not be ready for the first player:sync — resync once loaded.
-        setTimeout(() => {
-          if (!socket?.connected) return;
-          ITVLog.debug('player', 'Late-join resync');
-          socket.emit('room:requestSync');
-        }, 1800);
       }
 
       if (loggedInUser) {
@@ -402,14 +392,11 @@
       }
       roomState = state;
       renderRoom(state);
+      updatePlayerDjRole(state);
     });
 
     socket.on('player:sync', (payload) => {
       handlePlayerSync(payload);
-    });
-
-    socket.on('player:tick', (payload) => {
-      handlePlayerTick(payload);
     });
 
     socket.on('playlist:sync', (list) => {
@@ -1263,12 +1250,9 @@
     });
   }
 
-  ITVPlayer.setOnResyncRequest(() => {
-    if (socket?.connected) socket.emit('room:requestSync');
-  });
-
   ITVPlayer.setOnEnded(() => {
     if (!socket?.connected) return;
+    if (!isCurrentDjFromNowPlaying(roomState?.nowPlaying)) return;
     const payload = ITVPlayer.getEndedPayload?.() || {};
     ITVLog.info('player', 'player:ended emit', payload);
     socket.emit('player:ended', payload);

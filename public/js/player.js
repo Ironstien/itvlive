@@ -16,7 +16,7 @@ const ITVPlayer = (() => {
 
   let onEndedCallback = null;
 
-  let onResyncRequestCallback = null;
+  let isCurrentDj = false;
 
   let volumeLevel = 80;
 
@@ -39,8 +39,6 @@ const ITVPlayer = (() => {
   let overlayShown = false;
 
   let clockOffsetMs = 0;
-
-  let driftLoopTimer = null;
 
   const queue = [];
 
@@ -67,10 +65,6 @@ const ITVPlayer = (() => {
   const ENSURE_PLAY_COOLDOWN_MS = 2000;
 
   const SEEK_DRIFT_SEC = 1.5;
-
-  const DRIFT_LOOP_MS = 10000;
-
-  const RESYNC_DRIFT_SEC = 8;
 
   const TRACK_END_MIN_RATIO = 0.8;
 
@@ -250,68 +244,6 @@ const ITVPlayer = (() => {
 
 
 
-  function stopDriftLoop() {
-
-    if (driftLoopTimer) {
-
-      clearInterval(driftLoopTimer);
-
-      driftLoopTimer = null;
-
-    }
-
-  }
-
-
-
-  function startDriftLoop() {
-
-    stopDriftLoop();
-
-    driftLoopTimer = setInterval(() => {
-
-      if (!shouldBePlaying() || !lastSyncPayload) return;
-
-      if (!ytPlayer?.getCurrentTime) return;
-
-
-
-      const seekSec = resolveSeekSec(lastSyncPayload);
-
-      const ytTime = ytPlayer.getCurrentTime();
-
-      const drift = Math.abs(ytTime - seekSec);
-
-      if (drift > RESYNC_DRIFT_SEC) {
-
-        logPlayer('warn', 'Drift exceeds resync threshold', { drift, seekSec, ytTime });
-
-        // Stale server clock: do not hammer seekTo far ahead of actual playback.
-
-        if (seekSec <= ytTime + RESYNC_DRIFT_SEC + 30) {
-
-          seekIfNeeded(seekSec);
-
-        }
-
-        if (Math.abs(ytPlayer.getCurrentTime() - seekSec) > RESYNC_DRIFT_SEC) {
-
-          onResyncRequestCallback?.();
-
-        }
-
-        return;
-
-      }
-
-      seekIfNeeded(seekSec);
-
-    }, DRIFT_LOOP_MS);
-
-  }
-
-
-
   function beginAutoplayMuteTrick() {
 
     autoplayMuteTrick = !volumeMuted && volumeLevel > 0;
@@ -424,8 +356,6 @@ const ITVPlayer = (() => {
 
     if (isAlreadyPlaying()) {
 
-      seekIfNeeded(seekSec);
-
       expectPlaying = false;
 
       clearPlayRetry();
@@ -516,55 +446,9 @@ const ITVPlayer = (() => {
 
     setTimeout(() => ensurePlaying(seekSec, 'post-load'), 400);
 
-    setTimeout(() => ensurePlaying(seekSec, 'post-load-late'), 1800);
-
 
 
     return true;
-
-  }
-
-
-
-  function applyPlaybackHeartbeat(payload) {
-
-    if (!payload?.videoId) return;
-
-    updateClockOffset(payload);
-
-    lastSyncPayload = { ...lastSyncPayload, ...payload, isPlaying: true };
-
-
-
-    const seekSec = resolveSeekSec(payload);
-
-    whenReady(() => {
-
-      ensurePlayer();
-
-      if (!ytPlayer) return;
-
-
-
-      if (currentVideoId !== payload.videoId) {
-
-        loadAndPlay(payload.videoId, seekSec, 'heartbeat-load');
-
-        return;
-
-      }
-
-
-
-      seekIfNeeded(seekSec);
-
-      if (!isAlreadyPlaying()) {
-
-        ensurePlaying(seekSec, 'heartbeat');
-
-      }
-
-    });
 
   }
 
@@ -724,7 +608,7 @@ const ITVPlayer = (() => {
 
 
 
-          if (event.data === YT.PlayerState.ENDED && onEndedCallback) {
+          if (event.data === YT.PlayerState.ENDED && onEndedCallback && isCurrentDj) {
 
             if (!shouldEmitEnded()) {
 
@@ -834,14 +718,9 @@ const ITVPlayer = (() => {
 
     if (signature === lastSyncSignature) {
 
-      if (payload?.videoId && payload.isPlaying !== false) {
+      if (payload?.videoId) {
         updateClockOffset(payload);
         lastSyncPayload = { ...lastSyncPayload, ...payload };
-        const freshSeekSec = resolveSeekSec(payload);
-        seekIfNeeded(freshSeekSec);
-        if (!isAlreadyPlaying()) {
-          ensurePlaying(freshSeekSec, 'duplicate-sync');
-        }
       }
 
       return;
@@ -886,8 +765,6 @@ const ITVPlayer = (() => {
 
       clearPlayRetry();
 
-      stopDriftLoop();
-
       hideUnblockOverlay();
 
       currentVideoId = null;
@@ -909,8 +786,6 @@ const ITVPlayer = (() => {
 
 
     lastSyncPayload = payload;
-
-    startDriftLoop();
 
     if (idleEl) idleEl.classList.add('hidden');
 
@@ -943,6 +818,8 @@ const ITVPlayer = (() => {
         }
 
 
+
+        seekIfNeeded(seekSec);
 
         ensurePlaying(seekSec, 'sync-resume');
 
@@ -992,9 +869,9 @@ const ITVPlayer = (() => {
 
 
 
-  function setOnResyncRequest(fn) {
+  function setIsCurrentDj(value) {
 
-    onResyncRequestCallback = fn;
+    isCurrentDj = !!value;
 
   }
 
@@ -1048,11 +925,9 @@ const ITVPlayer = (() => {
 
     sync,
 
-    applyPlaybackHeartbeat,
-
     setOnEnded,
 
-    setOnResyncRequest,
+    setIsCurrentDj,
 
     whenReady,
 
