@@ -106,31 +106,6 @@
         <li><a href="/index.html" class="active">Main Stage</a></li>
       </ul>
       <div class="nav-actions">
-        <button
-          type="button"
-          id="btn-open-log"
-          class="btn-nav-log"
-          title="Open debug log popup — copy events for troubleshooting"
-        >
-          Log
-        </button>
-        <button
-          type="button"
-          id="btn-test-users"
-          class="btn-test-users"
-          aria-pressed="false"
-          title="Add or remove 24 dummy users in the Vinyl Pit and DJ queue"
-        >
-          Test Users
-        </button>
-        <button
-          type="button"
-          id="btn-reset-server"
-          class="btn-reset-server hidden"
-          title="Stop playback and clear the DJ queue (admin only)"
-        >
-          Reset Server
-        </button>
         <div class="nav-user" id="nav-user">Connecting…</div>
       </div>
     </header>
@@ -176,7 +151,62 @@
           <aside class="current-dj current-dj--avatar" id="current-dj-avatar" aria-label="Current DJ">
             <p class="current-dj__empty muted">No DJ</p>
           </aside>
-          <div class="player-stage__slot player-stage__slot--above" aria-hidden="true"></div>
+          <div class="player-stage__slot player-stage__slot--above">
+            <div
+              id="staff-tools-panel"
+              class="staff-tools-panel"
+              role="region"
+              aria-label="Staff tools (mod / admin)"
+            >
+              <span class="staff-tools-panel__label">Staff</span>
+              <div class="staff-tools-panel__controls">
+                <button
+                  type="button"
+                  id="btn-open-log"
+                  class="btn-nav-log"
+                  title="Open debug log popup — copy events for troubleshooting"
+                >
+                  Log
+                </button>
+                <button
+                  type="button"
+                  id="btn-test-users"
+                  class="btn-test-users"
+                  aria-pressed="false"
+                  title="Add or remove 24 dummy users in the Vinyl Pit and DJ queue"
+                >
+                  Test Users
+                </button>
+                <button
+                  type="button"
+                  id="btn-skip-test-track"
+                  class="btn-ghost btn-sm btn-skip-test"
+                  disabled
+                  title="Skip the current test user's song (dev)"
+                >
+                  Skip Track
+                </button>
+                <div class="effect-block">
+                  <label for="player-effect-select">Effect</label>
+                  <select id="player-effect-select" aria-label="Video player effect">
+                    <option value="1">Soft Aura</option>
+                    <option value="2">Solid Ring</option>
+                    <option value="3">Neon Void</option>
+                    <option value="4">Pulse</option>
+                    <option value="5">Vignette</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  id="btn-reset-server"
+                  class="btn-reset-server"
+                  title="Stop playback and clear the DJ queue (admin only)"
+                >
+                  Reset Server
+                </button>
+              </div>
+            </div>
+          </div>
           <div class="player-stack" id="player-stack" data-effect="1">
             <div class="player-ambient" id="player-ambient" aria-hidden="true">
               <img class="player-ambient__img" id="player-ambient-img" alt="" />
@@ -234,27 +264,6 @@
             <button type="button" class="btn-primary btn-sm btn-queue-action" id="btn-queue-action" data-mode="join">
               Join Queue
             </button>
-            <button
-              type="button"
-              id="btn-skip-test-track"
-              class="btn-ghost btn-sm btn-skip-test hidden"
-              disabled
-              title="Skip the current test user's song (dev)"
-            >
-              Skip Track
-            </button>
-
-            <div class="effect-block">
-              <label for="player-effect-select">Effect</label>
-              <select id="player-effect-select" aria-label="Video player effect">
-                <option value="1">Soft Aura</option>
-                <option value="2">Solid Ring</option>
-                <option value="3">Neon Void</option>
-                <option value="4">Pulse</option>
-                <option value="5">Vignette</option>
-              </select>
-            </div>
-
             <div class="vote-block">
               <label for="vote-slider">Vote (1–100)</label>
               <input type="range" id="vote-slider" min="1" max="100" value="50" disabled />

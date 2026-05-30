@@ -478,7 +478,12 @@
   function updateResetServerButton() {
     const btn = $('#btn-reset-server');
     if (!btn) return;
-    show(btn, isAdminUser());
+    // Dev: panel visible to everyone; server still enforces admin on reset.
+    show(btn, true);
+    btn.disabled = !isAdminUser();
+    btn.title = isAdminUser()
+      ? 'Stop playback and clear the DJ queue (admin only)'
+      : 'Admin only — log in as admin to reset the room';
   }
 
   function isTestUserSocketId(socketId) {
@@ -493,11 +498,14 @@
       testUsersOn &&
       !!state?.nowPlaying &&
       isTestUserSocketId(state.nowPlaying.socketId);
-    show(btn, testUsersOn);
+    // Dev: always visible in staff panel; enabled only when a test user is DJ.
+    show(btn, true);
     btn.disabled = !canSkip;
     btn.title = canSkip
       ? "Skip the current test user's song (dev)"
-      : 'Available when a test user is DJ';
+      : testUsersOn
+        ? 'Available when a test user is DJ'
+        : 'Enable Test Users first';
   }
 
   function updateQueueButton(state) {
