@@ -8,6 +8,9 @@ const ITVPlayer = (() => {
   let onEndedCallback = null;
   let volumeLevel = 80;
   let volumeMuted = false;
+  let expectPlaying = false;
+  let playRetryTimer = null;
+  let pendingSyncPayload = null;
   const queue = [];
 
   const YT_STATE_NAMES = {
@@ -29,11 +32,103 @@ const ITVPlayer = (() => {
     return `${payload.videoId}:${payload.startedAt || 0}`;
   }
 
+  function unblockEl() {
+    return document.getElementById('player-unblock');
+  }
+
+  function showUnblockOverlay() {
+    const el = unblockEl();
+    if (el) el.classList.remove('hidden');
+  }
+
+  function hideUnblockOverlay() {
+    const el = unblockEl();
+    if (el) el.classList.add('hidden');
+  }
+
+  function clearPlayRetry() {
+    if (playRetryTimer) {
+      clearTimeout(playRetryTimer);
+      playRetryTimer = null;
+    }
+  }
+
+  function schedulePlayRetry(reason) {
+    clearPlayRetry();
+    playRetryTimer = setTimeout(() => {
+      playRetryTimer = null;
+      if (!expectPlaying || !ytPlayer?.playVideo) return;
+      const state = ytPlayer.getPlayerState?.();
+      if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) {
+        hideUnblockOverlay();
+        return;
+      }
+      logPlayer('warn', 'Play retry', { reason, videoId: currentVideoId, stateCode: state });
+      try {
+        ytPlayer.playVideo();
+      } catch (err) {
+        logPlayer('warn', 'playVideo failed', { message: err?.message || String(err) });
+      }
+      if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.CUED) {
+        showUnblockOverlay();
+      }
+    }, 500);
+  }
+
+  function markExpectPlaying() {
+    expectPlaying = true;
+    schedulePlayRetry('mark');
+    setTimeout(() => {
+      if (expectPlaying) schedulePlayRetry('mark-delayed');
+    }, 1500);
+  }
+
+  function nudgePlayback(payload) {
+    if (!payload?.videoId) return;
+
+    const seekSec = payload.startedAt
+      ? Math.max(0, Math.floor((Date.now() - payload.startedAt) / 1000))
+      : 0;
+
+    whenReady(() => {
+      ensurePlayer();
+      if (!ytPlayer) return;
+
+      if (currentVideoId !== payload.videoId && ytPlayer.loadVideoById) {
+        currentVideoId = payload.videoId;
+        markExpectPlaying();
+        ytPlayer.loadVideoById(payload.videoId, seekSec);
+        return;
+      }
+
+      if (typeof ytPlayer.getCurrentTime === 'function') {
+        const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
+        if (drift > 12 && ytPlayer.seekTo) {
+          ytPlayer.seekTo(seekSec, true);
+        }
+      }
+
+      if (!isAlreadyPlaying()) {
+        logPlayer('warn', 'Nudging playback — duplicate sync but not playing', {
+          videoId: currentVideoId,
+          seekSec,
+        });
+        markExpectPlaying();
+        ytPlayer.playVideo?.();
+      }
+    });
+  }
+
   function onYouTubeIframeAPIReady() {
     ready = true;
     logPlayer('info', 'YouTube IFrame API ready');
     queue.forEach((fn) => fn());
     queue.length = 0;
+    if (pendingSyncPayload) {
+      const payload = pendingSyncPayload;
+      pendingSyncPayload = null;
+      sync(payload);
+    }
   }
 
   window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
@@ -53,10 +148,16 @@ const ITVPlayer = (() => {
         controls: 1,
         rel: 0,
         modestbranding: 1,
+        playsinline: 1,
       },
       events: {
         onReady() {
           applyVolume();
+          if (pendingSyncPayload) {
+            const payload = pendingSyncPayload;
+            pendingSyncPayload = null;
+            sync(payload);
+          }
         },
         onStateChange(event) {
           const stateName = YT_STATE_NAMES[event.data] || String(event.data);
@@ -64,13 +165,35 @@ const ITVPlayer = (() => {
             videoId: currentVideoId,
             stateCode: event.data,
           });
-          if (event.data === YT.PlayerState.PAUSED) {
+
+          if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING) {
+            expectPlaying = false;
+            clearPlayRetry();
+            hideUnblockOverlay();
+          }
+
+          if (
+            expectPlaying &&
+            (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.CUED)
+          ) {
+            schedulePlayRetry('state-change');
+            showUnblockOverlay();
+          }
+
+          if (event.data === YT.PlayerState.PAUSED && !expectPlaying) {
             logPlayer('warn', 'Playback paused', { videoId: currentVideoId });
           }
+
           if (event.data === YT.PlayerState.ENDED && onEndedCallback) {
             logPlayer('info', 'YT ENDED — firing onEnded callback', { videoId: currentVideoId });
             onEndedCallback();
           }
+        },
+        onError(event) {
+          logPlayer('error', 'YT player error', {
+            videoId: currentVideoId,
+            errorCode: event?.data,
+          });
         },
       },
     });
@@ -107,8 +230,19 @@ const ITVPlayer = (() => {
   }
 
   function sync(payload) {
+    if (!ready || typeof YT === 'undefined') {
+      pendingSyncPayload = payload;
+      whenReady(() => ensurePlayer());
+      return;
+    }
+
     const signature = syncSignature(payload);
-    if (signature === lastSyncSignature) return;
+    if (signature === lastSyncSignature) {
+      if (payload?.videoId && !isAlreadyPlaying()) {
+        nudgePlayback(payload);
+      }
+      return;
+    }
     lastSyncSignature = signature;
 
     logPlayer('debug', 'ITVPlayer.sync apply', {
@@ -120,6 +254,9 @@ const ITVPlayer = (() => {
     const idleEl = document.getElementById('player-idle');
     if (!payload?.videoId) {
       logPlayer('info', 'ITVPlayer.sync idle — no video', { previousVideoId: currentVideoId });
+      expectPlaying = false;
+      clearPlayRetry();
+      hideUnblockOverlay();
       currentVideoId = null;
       if (idleEl) idleEl.classList.remove('hidden');
       whenReady(() => {
@@ -130,6 +267,7 @@ const ITVPlayer = (() => {
     }
 
     if (idleEl) idleEl.classList.add('hidden');
+    hideUnblockOverlay();
 
     const seekSec = payload.startedAt
       ? Math.max(0, Math.floor((Date.now() - payload.startedAt) / 1000))
@@ -151,6 +289,7 @@ const ITVPlayer = (() => {
             seekSec,
           });
           currentVideoId = payload.videoId;
+          markExpectPlaying();
           ytPlayer.loadVideoById(payload.videoId, seekSec);
           return;
         }
@@ -172,11 +311,22 @@ const ITVPlayer = (() => {
             videoId: currentVideoId,
             seekSec,
           });
+          markExpectPlaying();
           ytPlayer.playVideo();
         }
       };
 
       apply();
+    });
+  }
+
+  function userPlay() {
+    whenReady(() => {
+      ensurePlayer();
+      if (!ytPlayer?.playVideo) return;
+      markExpectPlaying();
+      ytPlayer.playVideo();
+      hideUnblockOverlay();
     });
   }
 
@@ -193,5 +343,20 @@ const ITVPlayer = (() => {
     return currentVideoId;
   }
 
-  return { sync, setOnEnded, whenReady, getCurrentTime, getCurrentVideoId, setVolume, getVolume };
+  function initUnblock() {
+    const btn = document.getElementById('btn-player-unblock');
+    btn?.addEventListener('click', () => userPlay());
+  }
+
+  return {
+    sync,
+    setOnEnded,
+    whenReady,
+    getCurrentTime,
+    getCurrentVideoId,
+    setVolume,
+    getVolume,
+    userPlay,
+    initUnblock,
+  };
 })();

@@ -175,6 +175,10 @@
         }, 2500);
         return;
       }
+      ITVLog.warn('player', 'Still waiting for resync — ignoring idle sync', {
+        localVideoId,
+      });
+      return;
     }
 
     pendingIdleResync = false;
@@ -952,7 +956,12 @@
     ITVLog.info('user', `queue action: ${mode}`, { event: action.event });
     socket.emit(action.event, {}, (res) => {
       if (res?.error) toast(res.error, true);
-      else toast(action.ok);
+      else {
+        toast(action.ok);
+        if (mode === 'join' || mode === 'skip') {
+          ITVPlayer.userPlay?.();
+        }
+      }
     });
   });
 
@@ -1100,6 +1109,7 @@
     initPlaylistDragDrop();
     initVolumeControl();
     ITVPlayerEffects.init();
+    ITVPlayer.initUnblock();
     initOverlays();
 
     document.addEventListener('visibilitychange', () => {
