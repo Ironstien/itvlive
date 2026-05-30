@@ -198,6 +198,22 @@
                 </div>
                 <button
                   type="button"
+                  id="btn-mod-clear-chat"
+                  class="btn-ghost btn-sm"
+                  title="Clear live chat (mod / admin)"
+                >
+                  Clear Chat
+                </button>
+                <button
+                  type="button"
+                  id="btn-mod-skip"
+                  class="btn-ghost btn-sm"
+                  title="Skip current song (mod / admin)"
+                >
+                  Skip Song
+                </button>
+                <button
+                  type="button"
                   id="btn-reset-server"
                   class="btn-reset-server"
                   title="Stop playback and clear the DJ queue (admin only)"
@@ -267,7 +283,7 @@
             <div class="vote-block">
               <label for="vote-slider">Vote (1–100)</label>
               <input type="range" id="vote-slider" min="1" max="100" value="50" disabled />
-              <span class="vote-value"><span id="vote-value">50</span> <small>(Ph.2)</small></span>
+              <span class="vote-value"><span id="vote-value">50</span> <small id="vote-hint">(log in to vote)</small></span>
             </div>
 
             <div class="air-sign air-sign--listening" id="air-sign" aria-live="polite">

@@ -78,10 +78,45 @@
   // —— Vote slider preview (disabled until Phase 2) ——
   const voteSlider = $('#vote-slider');
   const voteValue = $('#vote-value');
+  const voteHint = $('#vote-hint');
+  let voteSendTimer = null;
+  let lastVoteSessionId = null;
+
   if (voteSlider && voteValue) {
     voteSlider.addEventListener('input', () => {
       voteValue.textContent = voteSlider.value;
+      scheduleVoteSend(Number(voteSlider.value));
     });
+  }
+
+  function scheduleVoteSend(score) {
+    if (!loggedInUser || !socket?.connected) return;
+    clearTimeout(voteSendTimer);
+    voteSendTimer = setTimeout(() => {
+      const sessionId = roomState?.nowPlaying?.playSessionId;
+      if (!sessionId) return;
+      socket.emit('vote:set', { playSessionId: sessionId, score }, (res) => {
+        if (res?.error) ITVLog.debug('vote', 'vote:set rejected', { error: res.error });
+      });
+    }, 250);
+  }
+
+  function updateVoteUi(state) {
+    if (!voteSlider) return;
+    const loggedIn = !!loggedInUser;
+    const sessionId = state?.nowPlaying?.playSessionId || null;
+    const canVote = loggedIn && !!sessionId;
+    voteSlider.disabled = !canVote;
+    if (voteHint) {
+      if (!loggedIn) voteHint.textContent = '(log in to vote)';
+      else if (!sessionId) voteHint.textContent = '(waiting for a track)';
+      else voteHint.textContent = '(saved when song ends)';
+    }
+    if (sessionId && sessionId !== lastVoteSessionId) {
+      lastVoteSessionId = sessionId;
+      voteSlider.value = 50;
+      if (voteValue) voteValue.textContent = '50';
+    }
   }
 
   function navState(extra = {}) {
@@ -130,6 +165,14 @@
 
   function isAdminUser() {
     return loggedInUser?.staffRole === 'admin';
+  }
+
+  function applyProfilePatch(profile) {
+    if (!profile || !loggedInUser) return;
+    loggedInUser = { ...loggedInUser, ...profile };
+    renderNavUser({ user: loggedInUser });
+    updateResetServerButton();
+    updateStaffToolsButtons(roomState);
   }
 
   function isCurrentDj(state) {
@@ -397,6 +440,28 @@
     socket.on('playlist:sync', (list) => {
       applyPlaylistSync(list, 'server');
     });
+
+    socket.on('user:profile', (profile) => {
+      if (profile && loggedInUser && profile.id === loggedInUser.id) {
+        applyProfilePatch(profile);
+      }
+    });
+
+    socket.on('user:levelUp', (payload) => {
+      if (!payload) return;
+      if (loggedInUser && payload.userId === myUserId()) {
+        loggedInUser = { ...loggedInUser, level: payload.level };
+        renderNavUser({ user: loggedInUser });
+      }
+      toast(`${payload.username || 'Someone'} reached ${payload.levelName || `Level ${payload.level}`}!`);
+    });
+
+    socket.on('vote:results', (results) => {
+      if (!results?.voteCount) return;
+      toast(
+        `Votes: avg ${Math.round(results.averageScore)} · high ${results.scoreHigh} · low ${results.scoreLow} (${results.voteCount})`
+      );
+    });
   }
 
   function updateDjBanner(player) {
@@ -458,12 +523,26 @@
   function updateResetServerButton() {
     const btn = $('#btn-reset-server');
     if (!btn) return;
-    // Dev: panel visible to everyone; server still enforces admin on reset.
     show(btn, true);
     btn.disabled = !isAdminUser();
     btn.title = isAdminUser()
       ? 'Stop playback and clear the DJ queue (admin only)'
       : 'Admin only — log in as admin to reset the room';
+    updateStaffToolsButtons(roomState);
+  }
+
+  function updateStaffToolsButtons(state) {
+    const staff = isStaffUser();
+    const clearBtn = $('#btn-mod-clear-chat');
+    const skipBtn = $('#btn-mod-skip');
+    if (clearBtn) {
+      clearBtn.disabled = !staff;
+      clearBtn.title = staff ? 'Clear live chat' : 'Moderator permissions required';
+    }
+    if (skipBtn) {
+      skipBtn.disabled = !staff || !state?.nowPlaying;
+      skipBtn.title = staff ? 'Skip current song' : 'Moderator permissions required';
+    }
   }
 
   function isTestUserSocketId(socketId) {
@@ -538,11 +617,50 @@
       onlineEl.innerHTML = '';
       (state.users || []).forEach((u) => {
         const li = document.createElement('li');
+        li.className = 'online-list__item';
         const you =
           myUserId() && String(u.userId) === myUserId() ? ' (you)' : '';
         const q = u.inQueue ? ' · in queue' : '';
         const off = u.connected === false ? ' · offline' : '';
-        li.textContent = `${u.displayName}${you}${q}${off}`;
+        const rank = u.level ? ` · L${u.level}` : '';
+        const staff =
+          u.staffRole && STAFF_ROLE_LABELS[u.staffRole]
+            ? ` · ${STAFF_ROLE_LABELS[u.staffRole]}`
+            : '';
+        const label = document.createElement('span');
+        label.textContent = `${u.displayName}${you}${rank}${staff}${q}${off}`;
+        li.appendChild(label);
+
+        if (isStaffUser() && u.userId && String(u.userId) !== myUserId()) {
+          const actions = document.createElement('span');
+          actions.className = 'online-list__actions';
+          const timeoutBtn = document.createElement('button');
+          timeoutBtn.type = 'button';
+          timeoutBtn.className = 'btn-ghost btn-sm';
+          timeoutBtn.textContent = 'Timeout';
+          timeoutBtn.title = 'Chat timeout 10 min';
+          timeoutBtn.addEventListener('click', () => {
+            socket.emit('mod:timeout', { targetUserId: u.userId, minutes: 10 }, (res) => {
+              if (res?.error) toast(res.error, true);
+              else toast(`${u.displayName} timed out from chat`);
+            });
+          });
+          const kickBtn = document.createElement('button');
+          kickBtn.type = 'button';
+          kickBtn.className = 'btn-ghost btn-sm';
+          kickBtn.textContent = 'Kick';
+          kickBtn.title = 'Disconnect user';
+          kickBtn.addEventListener('click', () => {
+            socket.emit('mod:kick', { targetUserId: u.userId }, (res) => {
+              if (res?.error) toast(res.error, true);
+              else toast(`${u.displayName} removed`);
+            });
+          });
+          actions.appendChild(timeoutBtn);
+          actions.appendChild(kickBtn);
+          li.appendChild(actions);
+        }
+
         onlineEl.appendChild(li);
       });
     }
@@ -618,6 +736,7 @@
     updateAirSign(state);
     updateTestUsersButton(state);
     updateResetServerButton();
+    updateVoteUi(state);
   }
 
   function formatDuration(seconds) {
@@ -1161,6 +1280,30 @@
         return;
       }
       toast('Server reset — queue cleared, playback stopped');
+    });
+  });
+
+  $('#btn-mod-clear-chat')?.addEventListener('click', () => {
+    if (!requireSocket()) return;
+    if (!isStaffUser()) {
+      toast('Moderator permissions required', true);
+      return;
+    }
+    socket.emit('mod:clearChat', {}, (res) => {
+      if (res?.error) toast(res.error, true);
+      else toast('Chat cleared');
+    });
+  });
+
+  $('#btn-mod-skip')?.addEventListener('click', () => {
+    if (!requireSocket()) return;
+    if (!isStaffUser()) {
+      toast('Moderator permissions required', true);
+      return;
+    }
+    socket.emit('queue:mod-skip', {}, (res) => {
+      if (res?.error) toast(res.error, true);
+      else toast('Skipped current song');
     });
   });
 

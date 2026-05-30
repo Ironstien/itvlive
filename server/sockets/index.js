@@ -11,7 +11,13 @@ const { scheduleRoomSave, flushRoomSave, hydrateRoom } = require('../services/ro
 const { isDbConnected } = require('../config/db');
 
 const { getBootMeta } = require('../services/serverBoot');
-const { isAdmin } = require('../config/permissions');
+const { check, ACTIONS, isAdmin } = require('../config/permissions');
+const {
+  finalizePlaySession,
+  incrementChatMessageCount,
+  logModAction,
+} = require('../services/stats');
+const { toPublicProfile } = require('../services/auth');
 const {
   toggleTestUsers,
   isTestUsersEnabled,
@@ -37,6 +43,9 @@ const PLAYER_TICK_MS = 15000;
 let ioRef = null;
 
 let playerTickTimer = null;
+
+/** @type {object|null} snapshot captured just before track end */
+let lastEndedTrack = null;
 
 
 
@@ -368,6 +377,52 @@ async function handleTrackEnded(io, playlistSyncFor) {
 
   stopPlayerTick();
 
+  const endedTrack = lastEndedTrack;
+
+  lastEndedTrack = null;
+
+  if (endedTrack && isDbConnected()) {
+
+    try {
+
+      const pending = room.getPendingVotesForSession(endedTrack.playSessionId);
+
+      const connected = room.getConnectedLoggedInUserIds();
+
+      const { voteResults, levelUps } = await finalizePlaySession(
+
+        endedTrack,
+
+        connected,
+
+        pending
+
+      );
+
+      room.clearPendingVotesForSession(endedTrack.playSessionId);
+
+      if (voteResults) {
+
+        io.emit('vote:results', withBootMeta(voteResults));
+
+      }
+
+      for (const up of levelUps) {
+
+        room.applyProfileToUser(up.userId, { level: up.level });
+
+        notifyLevelUp(io, up);
+
+      }
+
+    } catch (err) {
+
+      console.warn('[trackEnd] stats failed:', err.message);
+
+    }
+
+  }
+
   if (playlistSyncFor) {
 
     await persistPlaylist(playlistSyncFor);
@@ -379,6 +434,44 @@ async function handleTrackEnded(io, playlistSyncFor) {
   broadcast(io);
 
   emitPlayerSync(io);
+
+}
+
+
+
+function notifyLevelUp(io, levelUp) {
+
+  if (!io || !levelUp?.userId) return;
+
+  const socketId = room._liveSocketForUserId(levelUp.userId);
+
+  if (socketId) {
+
+    io.to(socketId).emit('user:levelUp', withBootMeta(levelUp));
+
+  }
+
+  broadcastRoom(io);
+
+}
+
+
+
+function pushUserProfileUpdate(userId, profile) {
+
+  if (!ioRef || !userId) return;
+
+  room.applyProfileToUser(String(userId), profile);
+
+  const socketId = room._liveSocketForUserId(String(userId));
+
+  if (socketId) {
+
+    ioRef.to(socketId).emit('user:profile', profile);
+
+  }
+
+  broadcastRoom(ioRef);
 
 }
 
@@ -525,6 +618,14 @@ function registerSockets(httpServer) {
   room.setTrackStartHandler((djUserId) => {
 
     void onTrackStarted(djUserId);
+
+  });
+
+
+
+  room.setBeforeTrackEndHandler((np) => {
+
+    lastEndedTrack = np ? { ...np } : null;
 
   });
 
@@ -896,9 +997,155 @@ function registerSockets(httpServer) {
 
       if (result.ok) {
 
+        void logModAction(
+
+          socket.data.userId,
+
+          targetUserId,
+
+          'mod:queueKick',
+
+          null
+
+        );
+
         broadcast(io);
 
         scheduleRoomSave(room);
+
+      }
+
+    });
+
+
+
+    socket.on('vote:set', ({ playSessionId, score }, ack) => {
+
+      const user = room.users.get(socket.id);
+
+      const perm = check(user, ACTIONS.VOTE);
+
+      if (!perm.ok) {
+
+        if (typeof ack === 'function') ack({ error: perm.error });
+
+        return;
+
+      }
+
+      const np = room.nowPlaying;
+
+      if (!np?.playSessionId) {
+
+        if (typeof ack === 'function') ack({ error: 'Nothing is playing to vote on' });
+
+        return;
+
+      }
+
+      if (playSessionId && String(playSessionId) !== String(np.playSessionId)) {
+
+        if (typeof ack === 'function') ack({ error: 'That song is no longer playing' });
+
+        return;
+
+      }
+
+      const result = room.setPendingVote(user.userId, np.playSessionId, score);
+
+      if (typeof ack === 'function') ack(result);
+
+      if (result.ok) {
+
+        io.emit('vinyl:votePulse', withBootMeta({ playSessionId: np.playSessionId }));
+
+      }
+
+    });
+
+
+
+    socket.on('mod:timeout', ({ targetUserId, minutes }, ack) => {
+
+      const result = room.modTimeout(socket.id, targetUserId, minutes);
+
+      if (typeof ack === 'function') ack(result);
+
+      if (result.ok) {
+
+        void logModAction(socket.data.userId, targetUserId, 'mod:timeout', {
+
+          minutes: result.minutes,
+
+        });
+
+        broadcast(io);
+
+      }
+
+    });
+
+
+
+    socket.on('mod:kick', ({ targetUserId }, ack) => {
+
+      const result = room.modKickUser(socket.id, targetUserId);
+
+      if (typeof ack === 'function') ack(result);
+
+      if (result.ok) {
+
+        void logModAction(socket.data.userId, targetUserId, 'mod:kick', null);
+
+        const targetSocket = io.sockets.sockets.get(result.socketId);
+
+        if (targetSocket) {
+
+          targetSocket.emit('room:error', { error: 'You were removed from the room by a moderator' });
+
+          targetSocket.disconnect(true);
+
+        }
+
+        broadcast(io);
+
+      }
+
+    });
+
+
+
+    socket.on('mod:clearChat', (_payload, ack) => {
+
+      const result = room.modClearChat(socket.id);
+
+      if (typeof ack === 'function') ack(result);
+
+      if (result.ok) {
+
+        void logModAction(socket.data.userId, null, 'mod:clearChat', null);
+
+        broadcast(io);
+
+      }
+
+    });
+
+
+
+    socket.on('queue:mod-skip', (_payload, ack) => {
+
+      const djUserId = room.nowPlaying?.userId || null;
+
+      const result = room.modSkipCurrent(socket.id);
+
+      if (typeof ack === 'function') ack(result);
+
+      if (result.ok) {
+
+        void logModAction(socket.data.userId, djUserId, 'mod:skipSong', null);
+
+        void handleTrackEnded(io, result.playlistSyncFor);
 
       }
 
@@ -1036,7 +1283,29 @@ function registerSockets(httpServer) {
 
         if (typeof ack === 'function') ack(result);
 
-        if (result.ok) broadcast(io);
+        if (result.ok) {
+
+          broadcast(io);
+
+          const user = room.users.get(socket.id);
+
+          if (user?.userId) {
+
+            void incrementChatMessageCount(String(user.userId)).then((levelUp) => {
+
+              if (levelUp) {
+
+                room.applyProfileToUser(levelUp.userId, { level: levelUp.level });
+
+                notifyLevelUp(io, levelUp);
+
+              }
+
+            });
+
+          }
+
+        }
 
       } catch (err) {
 
@@ -1139,6 +1408,8 @@ module.exports = {
   room,
 
   getBootMeta,
+
+  pushUserProfileUpdate,
 
 };
 

@@ -4,6 +4,7 @@ const PlaySession = require('./PlaySession');
 const Vote = require('./Vote');
 const PlaylistItem = require('./PlaylistItem');
 const RoomSnapshot = require('./RoomSnapshot');
+const ModAction = require('./ModAction');
 
 module.exports = {
   User,
@@ -12,4 +13,5 @@ module.exports = {
   Vote,
   PlaylistItem,
   RoomSnapshot,
+  ModAction,
 };

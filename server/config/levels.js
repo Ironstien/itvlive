@@ -1,5 +1,6 @@
 /**
  * Earned member levels (1–5). Edit thresholds here without touching game logic elsewhere.
+ * Suggestion A — casual progression (OR rules for L2 and L5).
  */
 
 const LEVEL_NAMES = Object.freeze({
@@ -13,21 +14,32 @@ const LEVEL_NAMES = Object.freeze({
 /** Requirements to reach each level (Level 1 is default on signup). */
 const LEVEL_THRESHOLDS = Object.freeze({
   2: {
-    emailVerified: true,
-    votesGivenCount: 5,
+    anyOf: [
+      { votesGivenCount: 3 },
+      { chatMessageCount: 10 },
+      { accountAgeDays: 3 },
+    ],
   },
   3: {
-    accountAgeDays: 30,
-    votesGivenCount: 50,
-    chatMessageCount: 20,
+    allOf: [
+      { accountAgeDays: 14 },
+      { votesGivenCount: 25 },
+      { chatMessageCount: 15 },
+    ],
   },
   4: {
-    accountAgeDays: 90,
-    totalListens: 200,
-    totalPlays: 10,
+    allOf: [
+      { accountAgeDays: 60 },
+      { totalListens: 75 },
+      { totalPlays: 5 },
+    ],
   },
   5: {
-    manual: true,
+    anyOf: [
+      { accountAgeDays: 180 },
+      { totalListens: 500 },
+      { totalPlays: 50 },
+    ],
   },
 });
 
@@ -47,44 +59,49 @@ function accountAgeDays(user) {
   return Math.floor((Date.now() - created.getTime()) / (24 * 60 * 60 * 1000));
 }
 
+function statValue(user, key) {
+  if (key === 'accountAgeDays') return accountAgeDays(user);
+  return user?.[key] || 0;
+}
+
+function meetsRequirement(user, req) {
+  const [[key, min]] = Object.entries(req);
+  return statValue(user, key) >= min;
+}
+
+function meetsAnyOf(user, requirements) {
+  return requirements.some((req) => meetsRequirement(user, req));
+}
+
+function meetsAllOf(user, requirements) {
+  return requirements.every((req) => meetsRequirement(user, req));
+}
+
+function qualifiesForLevel(user, level) {
+  const t = LEVEL_THRESHOLDS[level];
+  if (!t) return false;
+  if (t.anyOf) return meetsAnyOf(user, t.anyOf);
+  if (t.allOf) return meetsAllOf(user, t.allOf);
+  return false;
+}
+
 /**
  * Return the highest level the user qualifies for, or null if unchanged.
  * @param {object} user — Mongo User document or plain stats object
  * @returns {number|null}
  */
 function computeEligibleLevel(user) {
-  if (!user) return 1;
-
-  let eligible = 1;
-
-  const t2 = LEVEL_THRESHOLDS[2];
-  if (user.emailVerified === true && (user.votesGivenCount || 0) >= t2.votesGivenCount) {
-    eligible = 2;
-  } else {
-    return clampLevel(user.level || 1) === eligible ? null : Math.max(clampLevel(user.level || 1), eligible);
-  }
-
-  const t3 = LEVEL_THRESHOLDS[3];
-  if (
-    accountAgeDays(user) >= t3.accountAgeDays &&
-    (user.votesGivenCount || 0) >= t3.votesGivenCount &&
-    (user.chatMessageCount || 0) >= t3.chatMessageCount
-  ) {
-    eligible = 3;
-  } else {
-    return clampLevel(user.level || 1) >= eligible ? null : eligible;
-  }
-
-  const t4 = LEVEL_THRESHOLDS[4];
-  if (
-    accountAgeDays(user) >= t4.accountAgeDays &&
-    (user.totalListens || 0) >= t4.totalListens &&
-    (user.totalPlays || 0) >= t4.totalPlays
-  ) {
-    eligible = 4;
-  }
+  if (!user) return null;
 
   const current = clampLevel(user.level || 1);
+  let eligible = 1;
+
+  for (let level = 2; level <= 5; level += 1) {
+    if (qualifiesForLevel(user, level)) {
+      eligible = level;
+    }
+  }
+
   return eligible > current ? eligible : null;
 }
 
@@ -94,4 +111,5 @@ module.exports = {
   getLevelName,
   computeEligibleLevel,
   accountAgeDays,
+  qualifiesForLevel,
 };

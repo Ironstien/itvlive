@@ -31,6 +31,15 @@ class Room {
     this._trackEndTimer = null;
     this._onTrackEnd = null;
     this._onTrackStart = null;
+    this._onBeforeTrackEnd = null;
+    /** @type {Map<string, Map<string, number>>} playSessionId → userId → score */
+    this._pendingVotes = new Map();
+    /** @type {Map<string, number>} userId → chat blocked until timestamp */
+    this._chatTimeouts = new Map();
+  }
+
+  setBeforeTrackEndHandler(fn) {
+    this._onBeforeTrackEnd = typeof fn === 'function' ? fn : null;
   }
 
   setTrackEndHandler(fn) {
@@ -111,10 +120,112 @@ class Room {
     return this.users.has(member.socketId);
   }
 
-  _liveSocketForUserId(userId) {
-    const member = this._getMember(userId);
-    if (!member?.connected || !member.socketId) return null;
-    return this.users.has(member.socketId) ? member.socketId : null;
+  getConnectedLoggedInUserIds() {
+    const ids = new Set();
+    for (const user of this.users.values()) {
+      if (user.userId) ids.add(String(user.userId));
+    }
+    return [...ids];
+  }
+
+  setPendingVote(userId, playSessionId, score) {
+    if (!userId || !playSessionId) return { error: 'Invalid vote target' };
+    const n = Math.floor(Number(score));
+    if (!Number.isFinite(n) || n < 1 || n > 100) return { error: 'Score must be 1–100' };
+    const sid = String(playSessionId);
+    if (!this._pendingVotes.has(sid)) this._pendingVotes.set(sid, new Map());
+    this._pendingVotes.get(sid).set(String(userId), n);
+    return { ok: true, score: n };
+  }
+
+  getPendingVotesForSession(playSessionId) {
+    if (!playSessionId) return new Map();
+    return new Map(this._pendingVotes.get(String(playSessionId)) || []);
+  }
+
+  clearPendingVotesForSession(playSessionId) {
+    if (playSessionId) this._pendingVotes.delete(String(playSessionId));
+  }
+
+  applyProfileToUser(userId, profile = {}) {
+    const id = String(userId);
+    const member = this._getMember(id);
+    if (member) this._syncMemberProfile(member, profile);
+
+    const socketId = this._liveSocketForUserId(id);
+    if (socketId) {
+      const user = this.users.get(socketId);
+      if (user) {
+        if (profile.level != null) user.level = profile.level;
+        if (profile.staffRole !== undefined) {
+          user.staffRole = profile.staffRole;
+          user.role = profile.staffRole === 'admin' ? 'admin' : 'user';
+        }
+        if (profile.username) user.displayName = String(profile.username).slice(0, 24);
+        if (profile.avatarUrl !== undefined) user.avatarUrl = profile.avatarUrl || null;
+        if (profile.customSaying !== undefined) {
+          user.customSaying = String(profile.customSaying || '').slice(0, 120);
+        }
+        if (profile.badges !== undefined) {
+          user.badges = Array.isArray(profile.badges) ? [...profile.badges] : [];
+        }
+        if (profile.tokenBalance != null) user.tokenBalance = profile.tokenBalance;
+      }
+    }
+
+    return { ok: true, socketId };
+  }
+
+  isChatTimedOut(userId) {
+    if (!userId) return false;
+    const until = this._chatTimeouts.get(String(userId));
+    if (!until) return false;
+    if (Date.now() >= until) {
+      this._chatTimeouts.delete(String(userId));
+      return false;
+    }
+    return true;
+  }
+
+  modTimeout(actorSocketId, targetUserId, minutes = 10) {
+    const actor = this.users.get(actorSocketId);
+    if (!can(actor, ACTIONS.MOD_TIMEOUT)) {
+      return { error: 'Moderator permissions required' };
+    }
+    if (!targetUserId) return { error: 'Target user required' };
+    const mins = Math.min(1440, Math.max(1, Math.floor(Number(minutes) || 10)));
+    this._chatTimeouts.set(String(targetUserId), Date.now() + mins * 60 * 1000);
+    return { ok: true, minutes: mins, targetUserId: String(targetUserId) };
+  }
+
+  modKickUser(actorSocketId, targetUserId) {
+    const actor = this.users.get(actorSocketId);
+    if (!can(actor, ACTIONS.MOD_KICK)) {
+      return { error: 'Moderator permissions required' };
+    }
+    if (!targetUserId) return { error: 'Target user required' };
+    const socketId = this._liveSocketForUserId(String(targetUserId));
+    if (!socketId) return { error: 'User is not connected' };
+    return { ok: true, targetUserId: String(targetUserId), socketId };
+  }
+
+  modClearChat(actorSocketId) {
+    const actor = this.users.get(actorSocketId);
+    if (!can(actor, ACTIONS.MOD_CLEAR_CHAT)) {
+      return { error: 'Moderator permissions required' };
+    }
+    this.chat = [];
+    return { ok: true };
+  }
+
+  modSkipCurrent(actorSocketId) {
+    const actor = this.users.get(actorSocketId);
+    if (!can(actor, ACTIONS.SKIP_ANY_NOW_PLAYING)) {
+      return { error: 'Moderator permissions required to skip this song' };
+    }
+    if (!this.nowPlaying) return { error: 'Nothing is playing' };
+    const playlistSyncFor = this._finishCurrentTrack(this.nowPlaying.userId);
+    return { ok: true, playlistSyncFor, playerChanged: true };
   }
 
   _syncMemberProfile(member, account = {}) {
@@ -576,6 +687,9 @@ class Room {
   addChat(socketId, text) {
     const user = this.users.get(socketId);
     if (!user) return { error: 'Not connected' };
+    if (user.userId && this.isChatTimedOut(user.userId)) {
+      return { error: 'You are timed out from chat' };
+    }
     const trimmed = String(text || '').trim().slice(0, MAX_MESSAGE_LEN);
     if (!trimmed) return { error: 'Message is empty' };
 
@@ -730,6 +844,13 @@ class Room {
   }
 
   _finishCurrentTrack(finishedUserId = null) {
+    if (this.nowPlaying && this._onBeforeTrackEnd) {
+      try {
+        this._onBeforeTrackEnd({ ...this.nowPlaying });
+      } catch (err) {
+        console.warn('[room] beforeTrackEnd handler failed:', err.message);
+      }
+    }
     this._clearTrackEndTimer();
     this.nowPlaying = null;
 

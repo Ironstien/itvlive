@@ -67,11 +67,16 @@
 
     if (state.user) {
       const av = avatarImg(state.user, 'nav-avatar', 26);
+      const adminLink =
+        state.user.staffRole === 'admin'
+          ? ' · <a href="/admin.html">Admin</a>'
+          : '';
       container.innerHTML = `
         <span class="nav-user-inner">
           ${av}
           <button type="button" class="link-btn nav-username" id="nav-open-profile">${escapeHtml(state.user.username)}</button>
-          · <button type="button" class="link-btn" id="nav-open-settings">Settings</button>
+          · L${state.user.level || 1}
+          · <button type="button" class="link-btn" id="nav-open-settings">Settings</button>${adminLink}
           · <a href="#" id="nav-logout" class="nav-logout">Log out</a>
         </span>
       `;

@@ -150,9 +150,7 @@ function can(user, action, context = {}) {
   const principal = normalizePrincipal(user);
 
   if (action === ACTIONS.VOTE) {
-    if (principal.level < MIN_LEVEL[ACTIONS.VOTE]) return false;
-    if (!principal.emailVerified) return false;
-    return true;
+    return Boolean(principal.userId) && !principal.isGuest;
   }
 
   if (action === ACTIONS.SKIP_OWN_NOW_PLAYING) {
@@ -180,11 +178,8 @@ function check(user, action, context = {}) {
   const principal = normalizePrincipal(user);
 
   if (action === ACTIONS.VOTE) {
-    if (principal.level < MIN_LEVEL[ACTIONS.VOTE]) {
-      return { error: 'Voting requires Member rank (Level 2) or higher' };
-    }
-    if (!principal.emailVerified) {
-      return { error: 'Verify your email before voting' };
+    if (!principal.userId || principal.isGuest) {
+      return { error: 'Log in to vote' };
     }
   }
 

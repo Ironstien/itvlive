@@ -8,6 +8,7 @@ const { connectDB, isDbConnected } = require('./config/db');
 const { registerRoutes } = require('./routes');
 const { registerSockets, initRoomFromStore, flushPersistedRoom, getBootMeta } = require('./sockets');
 const { parseYoutubeId, fetchStoryboard, youtubeThumbnailUrl } = require('./services/youtube');
+const { bootstrapAdminUser } = require('./services/bootstrapAdmin');
 
 require('./models');
 
@@ -98,6 +99,7 @@ registerSockets(httpServer);
 async function start() {
   try {
     await connectDB();
+    await bootstrapAdminUser();
   } catch (err) {
     console.error('[db] Connection failed:', err.message);
     process.exit(1);
