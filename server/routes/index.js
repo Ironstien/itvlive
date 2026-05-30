@@ -1,4 +1,5 @@
 const { authRouter } = require('./auth');
+const { playlistRouter } = require('./playlist');
 
 /**
  * REST route registration.
@@ -6,6 +7,7 @@ const { authRouter } = require('./auth');
  */
 function registerRoutes(app) {
   app.use('/api/auth', authRouter);
+  app.use('/api/playlist', playlistRouter);
 }
 
 module.exports = { registerRoutes };

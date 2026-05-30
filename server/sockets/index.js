@@ -1,8 +1,9 @@
 const { Server } = require('socket.io');
 const { Room } = require('../services/room');
 const { resolveSocketAuth } = require('../services/socketAuth');
-const { saveUserPlaylist } = require('../services/playlistStore');
+const { saveUserPlaylist, loadUserPlaylist } = require('../services/playlistStore');
 const { scheduleRoomSave, flushRoomSave, hydrateRoom } = require('../services/roomStore');
+const { isDbConnected } = require('../config/db');
 const { getBootMeta } = require('../services/serverBoot');
 const {
   toggleTestUsers,
@@ -81,10 +82,28 @@ function parseSocketAccount(auth = {}) {
 async function persistPlaylist(socketId) {
   const userId = room.getUserId(socketId);
   if (!userId) return;
+  if (!isDbConnected()) {
+    console.warn('[playlist] skip persist — database not connected');
+    return;
+  }
   try {
-    await saveUserPlaylist(userId, room.getPlaylist(socketId));
+    const items = room.getPlaylist(socketId);
+    await saveUserPlaylist(userId, items);
   } catch (err) {
     console.error('[playlist] persist failed:', err.message);
+  }
+}
+
+async function restoreUserPlaylist(socketId) {
+  const userId = room.getUserId(socketId);
+  if (!userId || !isDbConnected()) return room.getPlaylist(socketId);
+  try {
+    const saved = await loadUserPlaylist(userId);
+    room.setPlaylist(socketId, saved);
+    return saved;
+  } catch (err) {
+    console.error('[playlist] restore failed:', err.message);
+    return room.getPlaylist(socketId);
   }
 }
 
@@ -110,9 +129,7 @@ function registerSockets(httpServer) {
         resolved.displayName || `Guest-${socket.id.slice(0, 4)}`;
 
       room.addUser(socket.id, displayName, resolved.account);
-      if (resolved.playlist?.length) {
-        room.setPlaylist(socket.id, resolved.playlist);
-      }
+      room.setPlaylist(socket.id, resolved.playlist ?? []);
 
       socket.data.authenticated = resolved.isAuthenticated;
 
@@ -126,7 +143,9 @@ function registerSockets(httpServer) {
       return;
     }
 
-    socket.on('room:requestSync', () => {
+    socket.on('room:requestSync', async () => {
+      const playlist = await restoreUserPlaylist(socket.id);
+      socket.emit('playlist:sync', playlist);
       socket.emit('room:state', getRoomStatePayload());
       socket.emit('player:sync', getPlayerSyncPayload());
     });
@@ -144,8 +163,13 @@ function registerSockets(httpServer) {
       if (result.ok) broadcast(io);
     });
 
-    socket.on('user:attachAccount', (payload, ack) => {
+    socket.on('user:attachAccount', async (payload, ack) => {
       const result = room.attachUserAccount(socket.id, parseSocketAccount(payload));
+      if (result.ok && room.getUserId(socket.id)) {
+        const playlist = await restoreUserPlaylist(socket.id);
+        await persistPlaylist(socket.id);
+        socket.emit('playlist:sync', playlist);
+      }
       if (typeof ack === 'function') ack(result);
       if (result.ok) broadcast(io);
     });

@@ -192,10 +192,22 @@
     updateDjBanner(payload);
   }
 
+  async function fetchSavedPlaylist() {
+    if (!ITVAuth.getToken()) return [];
+    try {
+      const { ok, data } = await ITVAuth.api('/api/playlist');
+      if (!ok || !Array.isArray(data?.playlist)) return [];
+      return data.playlist;
+    } catch {
+      return [];
+    }
+  }
+
   function connectSocket(opts) {
     const displayName = typeof opts === 'string' ? opts : opts?.displayName;
     const token = typeof opts === 'object' && opts ? opts.token : null;
     const profile = typeof opts === 'object' && opts ? opts.profile : null;
+    const initialPlaylist = typeof opts === 'object' && opts ? opts.initialPlaylist : null;
 
     if (typeof io === 'undefined') {
       toast('Socket.io missing — restart server (npm.cmd start)', true);
@@ -205,9 +217,16 @@
     if (socket?.connected) socket.disconnect();
 
     loggedInUser = profile || null;
-    const auth = token ? { token } : { displayName };
+    if (Array.isArray(initialPlaylist)) {
+      applyPlaylistSync(initialPlaylist, 'saved');
+    }
+
     socket = io({
-      auth,
+      auth: (cb) => {
+        const liveToken = ITVAuth.getToken();
+        if (liveToken) cb({ token: liveToken });
+        else cb({ displayName: displayName || getDisplayName() || undefined });
+      },
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -1094,7 +1113,12 @@
 
     const user = await ITVAuth.fetchMe();
     if (user) {
-      connectSocket({ token: ITVAuth.getToken(), profile: user });
+      const savedPlaylist = await fetchSavedPlaylist();
+      connectSocket({
+        token: ITVAuth.getToken(),
+        profile: user,
+        initialPlaylist: savedPlaylist,
+      });
       return;
     }
 
