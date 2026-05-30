@@ -118,6 +118,46 @@ const ITVPlayer = (() => {
     setTimeout(() => {
       if (expectPlaying) schedulePlayRetry('mark-delayed', seekSec);
     }, 1200);
+    setTimeout(() => {
+      if (expectPlaying && shouldBePlaying()) schedulePlayRetry('mark-late', seekSec);
+    }, 2800);
+  }
+
+  function ensurePlaying(seekSec, reason) {
+    if (!shouldBePlaying() || !ytPlayer?.playVideo) return;
+
+    seekIfNeeded(seekSec);
+
+    if (isAlreadyPlaying()) {
+      expectPlaying = false;
+      clearPlayRetry();
+      hideUnblockOverlay();
+      return;
+    }
+
+    logPlayer('warn', 'ensurePlaying', { reason, videoId: currentVideoId, seekSec });
+    beginAutoplayMuteTrick();
+    markExpectPlaying(seekSec);
+    try {
+      ytPlayer.playVideo();
+    } catch (err) {
+      logPlayer('warn', 'playVideo failed', { message: err?.message || String(err) });
+    }
+
+    setTimeout(() => {
+      if (shouldBePlaying() && !isAlreadyPlaying()) {
+        showUnblockOverlay();
+      }
+    }, 700);
+  }
+
+  function schedulePostLoadPlay(videoId, seekSec) {
+    [150, 500, 1200, 2500].forEach((delay) => {
+      setTimeout(() => {
+        if (!shouldBePlaying() || currentVideoId !== videoId) return;
+        ensurePlaying(seekSec, `post-load-${delay}ms`);
+      }, delay);
+    });
   }
 
   function seekIfNeeded(seekSec) {
@@ -145,12 +185,7 @@ const ITVPlayer = (() => {
       startSeconds: seekSec,
     });
 
-    setTimeout(() => {
-      if (!ytPlayer?.playVideo) return;
-      seekIfNeeded(seekSec);
-      ytPlayer.playVideo();
-      schedulePlayRetry('post-load', seekSec);
-    }, 150);
+    schedulePostLoadPlay(videoId, seekSec);
 
     return true;
   }
@@ -169,17 +204,7 @@ const ITVPlayer = (() => {
         return;
       }
 
-      seekIfNeeded(seekSec);
-
-      if (!isAlreadyPlaying()) {
-        logPlayer('warn', 'Nudging playback — duplicate sync but not playing', {
-          videoId: currentVideoId,
-          seekSec,
-        });
-        beginAutoplayMuteTrick();
-        markExpectPlaying(seekSec);
-        ytPlayer.playVideo?.();
-      }
+      ensurePlaying(seekSec, 'nudge');
     });
   }
 
@@ -238,7 +263,7 @@ const ITVPlayer = (() => {
           }
 
           if (
-            expectPlaying &&
+            shouldBePlaying() &&
             (event.data === YT.PlayerState.PAUSED ||
               event.data === YT.PlayerState.CUED ||
               event.data === -1)
@@ -250,7 +275,7 @@ const ITVPlayer = (() => {
             }
           }
 
-          if (event.data === YT.PlayerState.PAUSED && !expectPlaying) {
+          if (event.data === YT.PlayerState.PAUSED && !shouldBePlaying() && !expectPlaying) {
             logPlayer('warn', 'Playback paused', { videoId: currentVideoId });
           }
 
@@ -269,9 +294,17 @@ const ITVPlayer = (() => {
     });
   }
 
+  function shouldBePlaying() {
+    return lastSyncPayload?.isPlaying === true && !!lastSyncPayload?.videoId;
+  }
+
   function applyVolume() {
     if (!ytPlayer?.setVolume) return;
     if (volumeMuted || volumeLevel === 0) {
+      ytPlayer.mute?.();
+      return;
+    }
+    if (autoplayMuteTrick) {
       ytPlayer.mute?.();
       return;
     }
@@ -320,9 +353,9 @@ const ITVPlayer = (() => {
     const seekSec = payload?.videoId ? computeSeekSec(payload) : 0;
 
     if (signature === lastSyncSignature) {
-      if (payload?.videoId) {
+      if (payload?.videoId && payload.isPlaying !== false) {
         seekIfNeeded(seekSec);
-        if (!isAlreadyPlaying() || isStalledAtStart(seekSec)) {
+        if (!isAlreadyPlaying()) {
           nudgePlayback(payload);
         }
       }
@@ -355,7 +388,6 @@ const ITVPlayer = (() => {
 
     lastSyncPayload = payload;
     if (idleEl) idleEl.classList.add('hidden');
-    hideUnblockOverlay();
 
     whenReady(() => {
       ensurePlayer();
@@ -371,17 +403,7 @@ const ITVPlayer = (() => {
           return;
         }
 
-        seekIfNeeded(seekSec);
-
-        if (!isAlreadyPlaying() || isStalledAtStart(seekSec)) {
-          logPlayer('warn', 'Resuming playback — join mid-track or stalled at start', {
-            videoId: currentVideoId,
-            seekSec,
-          });
-          beginAutoplayMuteTrick();
-          markExpectPlaying(seekSec);
-          ytPlayer.playVideo?.();
-        }
+        ensurePlaying(seekSec, 'sync-resume');
       };
 
       apply();
@@ -393,9 +415,11 @@ const ITVPlayer = (() => {
     whenReady(() => {
       ensurePlayer();
       if (!ytPlayer?.playVideo) return;
+      autoplayMuteTrick = false;
       seekIfNeeded(seekSec);
       markExpectPlaying(seekSec);
       ytPlayer.playVideo();
+      applyVolume();
       hideUnblockOverlay();
     });
   }
