@@ -62,7 +62,6 @@
   let hadConnectedOnce = false;
   let disconnectedAt = null;
   let pendingIdleResync = false;
-  let pendingUserPlay = false;
   let lastKnownBootId = sessionStorage.getItem(STORAGE_BOOT_ID) || null;
 
   // —— Tabs ——
@@ -264,10 +263,6 @@
       userId: payload?.userId,
       socketId: roomState?.nowPlaying?.socketId,
     });
-    if (pendingUserPlay) {
-      pendingUserPlay = false;
-      ITVPlayer.userPlay?.();
-    }
   }
 
   async function fetchSavedPlaylist() {
@@ -1128,7 +1123,6 @@
       else {
         toast(action.ok);
         if (mode === 'join' || mode === 'skip') {
-          pendingUserPlay = true;
           socket.emit('room:requestSync');
         }
       }
