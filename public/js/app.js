@@ -2,6 +2,8 @@
   const STORAGE_NAME = 'itv-displayName';
   const STORAGE_VOLUME = 'itv-volume';
   const STORAGE_MUTED = 'itv-muted';
+  const STORAGE_BOOT_ID = 'itv-serverBootId';
+  const IDLE_RESYNC_MS = 45000;
 
   const $ = (sel) => document.querySelector(sel);
   const show = (el, visible) => el?.classList.toggle('hidden', !visible);
@@ -57,6 +59,10 @@
   let roomState = null;
   let myPlaylist = [];
   let loggedInUser = null;
+  let hadConnectedOnce = false;
+  let disconnectedAt = null;
+  let pendingIdleResync = false;
+  let lastKnownBootId = sessionStorage.getItem(STORAGE_BOOT_ID) || null;
 
   // —— Tabs ——
   document.querySelectorAll('.chat-tab').forEach((tab) => {
@@ -137,6 +143,55 @@
     renderPlaylist(myPlaylist);
   }
 
+  function rememberBootId(bootId) {
+    if (!bootId) return;
+    if (lastKnownBootId && lastKnownBootId !== bootId) {
+      ITVLog.info('system', 'Server boot changed', {
+        from: lastKnownBootId,
+        to: bootId,
+      });
+    }
+    lastKnownBootId = bootId;
+    sessionStorage.setItem(STORAGE_BOOT_ID, bootId);
+  }
+
+  function handlePlayerSync(payload) {
+    if (payload?.bootId) rememberBootId(payload.bootId);
+
+    const localVideoId = ITVPlayer.getCurrentVideoId?.() || null;
+    const withinResyncWindow =
+      disconnectedAt != null && Date.now() - disconnectedAt < IDLE_RESYNC_MS;
+
+    if (!payload?.videoId && localVideoId && withinResyncWindow && socket?.connected) {
+      if (!pendingIdleResync) {
+        pendingIdleResync = true;
+        ITVLog.warn('player', 'Ignoring idle sync — requesting resync', {
+          localVideoId,
+          disconnectedMs: Date.now() - disconnectedAt,
+        });
+        socket.emit('room:requestSync');
+        setTimeout(() => {
+          pendingIdleResync = false;
+        }, 2500);
+        return;
+      }
+    }
+
+    pendingIdleResync = false;
+    disconnectedAt = null;
+
+    ITVLog.info('player', 'player:sync received', {
+      videoId: payload?.videoId || null,
+      title: payload?.title || null,
+      djName: payload?.djName || null,
+      startedAt: payload?.startedAt || null,
+      bootId: payload?.bootId || null,
+    });
+    ITVPlayer.sync(payload);
+    ITVAmbient.sync(payload, () => ITVPlayer.getCurrentTime());
+    updateDjBanner(payload);
+  }
+
   function connectSocket(opts) {
     const displayName = typeof opts === 'string' ? opts : opts?.displayName;
     const token = typeof opts === 'object' && opts ? opts.token : null;
@@ -151,7 +206,13 @@
 
     loggedInUser = profile || null;
     const auth = token ? { token } : { displayName };
-    socket = io({ auth });
+    socket = io({
+      auth,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 15000,
+    });
     instrumentSocket(socket);
 
     ITVLog.info('socket', 'Connecting', {
@@ -160,8 +221,22 @@
     });
 
     socket.on('connect', () => {
+      const reconnected = hadConnectedOnce;
       mySocketId = socket.id;
-      ITVLog.info('socket', 'Connected', { socketId: mySocketId });
+      pendingIdleResync = false;
+      hadConnectedOnce = true;
+
+      ITVLog.info('socket', reconnected ? 'Reconnected' : 'Connected', {
+        socketId: mySocketId,
+        reconnected,
+        disconnectedMs: disconnectedAt != null ? Date.now() - disconnectedAt : null,
+      });
+
+      if (reconnected) {
+        toast('Reconnected — syncing room', false);
+        socket.emit('room:requestSync');
+      }
+
       if (loggedInUser) {
         renderNavUser({ user: loggedInUser });
       } else {
@@ -172,17 +247,23 @@
       }
     });
 
+    socket.io.on('reconnect_attempt', (attempt) => {
+      ITVLog.debug('socket', 'Reconnect attempt', { attempt });
+    });
+
     socket.on('connect_error', (err) => {
       ITVLog.error('socket', 'connect_error', { message: err.message || String(err) });
       toast(err.message || 'Could not connect to live server', true);
     });
 
     socket.on('disconnect', (reason) => {
+      disconnectedAt = Date.now();
       ITVLog.warn('socket', 'Disconnected', { reason: reason || 'unknown' });
-      toast('Disconnected — refresh page', true);
+      toast('Connection lost — reconnecting…', true);
     });
 
     socket.on('room:state', (state) => {
+      if (state?.bootId) rememberBootId(state.bootId);
       const prevVideoId = roomState?.nowPlaying?.videoId ?? null;
       const nextVideoId = state?.nowPlaying?.videoId ?? null;
       if (prevVideoId !== nextVideoId) {
@@ -206,15 +287,7 @@
     });
 
     socket.on('player:sync', (payload) => {
-      ITVLog.info('player', 'player:sync received', {
-        videoId: payload?.videoId || null,
-        title: payload?.title || null,
-        djName: payload?.djName || null,
-        startedAt: payload?.startedAt || null,
-      });
-      ITVPlayer.sync(payload);
-      ITVAmbient.sync(payload, () => ITVPlayer.getCurrentTime());
-      updateDjBanner(payload);
+      handlePlayerSync(payload);
     });
 
     socket.on('playlist:sync', (list) => {
@@ -969,6 +1042,7 @@
     .then((r) => r.json())
     .then((data) => {
       ITVLog.info('system', 'Health check ok', data);
+      if (data.bootId) rememberBootId(data.bootId);
       if (!data.ok) {
         ITVLog.warn('system', 'Health check failed', data);
         toast('Server issue — run npm.cmd start', true);
@@ -1008,6 +1082,15 @@
     initVolumeControl();
     ITVPlayerEffects.init();
     initOverlays();
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      ITVLog.debug('system', 'Document visibility: visible');
+      if (socket && !socket.connected) {
+        ITVLog.info('socket', 'Tab visible — reconnecting socket');
+        socket.connect();
+      }
+    });
 
     const user = await ITVAuth.fetchMe();
     if (user) {

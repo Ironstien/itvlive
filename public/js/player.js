@@ -189,5 +189,9 @@ const ITVPlayer = (() => {
     return ytPlayer.getCurrentTime() || 0;
   }
 
-  return { sync, setOnEnded, whenReady, getCurrentTime, setVolume, getVolume };
+  function getCurrentVideoId() {
+    return currentVideoId;
+  }
+
+  return { sync, setOnEnded, whenReady, getCurrentTime, getCurrentVideoId, setVolume, getVolume };
 })();

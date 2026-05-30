@@ -6,7 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const { connectDB, isDbConnected } = require('./config/db');
 const { registerRoutes } = require('./routes');
-const { registerSockets } = require('./sockets');
+const { registerSockets, initRoomFromStore, flushPersistedRoom, getBootMeta } = require('./sockets');
 const { parseYoutubeId, fetchStoryboard, youtubeThumbnailUrl } = require('./services/youtube');
 
 require('./models');
@@ -34,6 +34,7 @@ app.get('/health', (_req, res) => {
     name: 'INTO THE VOID',
     phase: isDbConnected() ? 2 : 1,
     db: isDbConnected(),
+    ...getBootMeta(),
   });
 });
 
@@ -102,16 +103,40 @@ async function start() {
     process.exit(1);
   }
 
+  try {
+    await initRoomFromStore();
+  } catch (err) {
+    console.error('[room] Restore failed:', err.message);
+  }
+
   httpServer.listen(PORT, () => {
     console.log('');
     console.log(`  INTO THE VOID — Phase ${isDbConnected() ? 2 : 1}`);
     console.log(`  Main Stage: http://localhost:${PORT}/index.html`);
     console.log(`  Health:     http://localhost:${PORT}/health`);
     console.log(`  Database:   ${isDbConnected() ? 'connected' : 'skipped (guest mode)'}`);
+    console.log(`  Boot ID:    ${getBootMeta().bootId}`);
     console.log('');
     console.log('  Tip: open two browser tabs to test chat and queue.');
     console.log('');
   });
 }
+
+async function shutdown(signal) {
+  console.log(`\n[server] ${signal} — saving room state…`);
+  try {
+    await flushPersistedRoom();
+  } catch (err) {
+    console.error('[room] Shutdown save failed:', err.message);
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
+});
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
 
 start();

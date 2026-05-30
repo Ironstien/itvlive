@@ -19,6 +19,14 @@ function isTestUsersEnabled() {
   return enabled;
 }
 
+function setTestUsersEnabled(value) {
+  enabled = !!value;
+  if (!enabled) {
+    clearChatTimers();
+    lastChatTrackKey = null;
+  }
+}
+
 function clearChatTimers() {
   for (const timer of chatTimers) {
     clearTimeout(timer);
@@ -183,6 +191,7 @@ module.exports = {
   isTestSocketId,
   botSocketId,
   isTestUsersEnabled,
+  setTestUsersEnabled,
   enableTestUsers,
   disableTestUsers,
   toggleTestUsers,

@@ -451,6 +451,63 @@ class Room {
     return null;
   }
 
+  hydrateFromSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return;
+
+    this._clearTrackEndTimer();
+    this.users.clear();
+    this.playlists.clear();
+
+    for (const user of snapshot.users || []) {
+      if (!user?.socketId) continue;
+      this.users.set(user.socketId, {
+        socketId: user.socketId,
+        userId: user.userId ?? null,
+        displayName: user.displayName || `Guest-${String(user.socketId).slice(0, 4)}`,
+        level: user.level ?? 1,
+        staffRole: user.staffRole ?? null,
+        emailVerified: user.emailVerified === true,
+        avatarUrl: user.avatarUrl ?? null,
+        customSaying: user.customSaying ?? '',
+        badges: Array.isArray(user.badges) ? [...user.badges] : [],
+        role: user.role ?? (user.staffRole === 'admin' ? 'admin' : 'user'),
+        inQueue: user.inQueue === true,
+        connectedAt: user.connectedAt ?? Date.now(),
+      });
+    }
+
+    for (const [socketId, items] of Object.entries(snapshot.playlists || {})) {
+      this.playlists.set(socketId, Array.isArray(items) ? items.map((item) => ({ ...item })) : []);
+    }
+
+    this.globalQueue = (snapshot.globalQueue || []).map((entry) => ({ ...entry }));
+    this.nowPlaying = snapshot.nowPlaying ? { ...snapshot.nowPlaying } : null;
+    this._queueId = Number(snapshot.queueId) || 0;
+    this._chatId = Number(snapshot.chatId) || 0;
+    this._lastFinishedAt = snapshot.lastFinishedAt ?? null;
+    this.chat = (snapshot.chat || []).map((msg) => ({ ...msg }));
+  }
+
+  recoverExpiredTrack() {
+    let advanced = 0;
+    while (this.nowPlaying) {
+      const durationSec = this._resolveDurationSec(this.nowPlaying.durationSec);
+      const endAt = this.nowPlaying.startedAt + durationSec * 1000;
+      if (Date.now() < endAt) break;
+
+      const finishedSocketId = this.nowPlaying.socketId;
+      this._lastFinishedAt = `${this.nowPlaying.socketId}:${this.nowPlaying.startedAt}`;
+      this._finishCurrentTrack(finishedSocketId);
+      advanced += 1;
+    }
+
+    if (this.nowPlaying) {
+      this._scheduleTrackEndTimer();
+    }
+
+    return advanced;
+  }
+
   getPlayerSync() {
     if (!this.nowPlaying) {
       return { videoId: null, title: null, djName: null, startedAt: null, isPlaying: false };

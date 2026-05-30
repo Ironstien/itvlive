@@ -2,6 +2,8 @@ const { Server } = require('socket.io');
 const { Room } = require('../services/room');
 const { resolveSocketAuth } = require('../services/socketAuth');
 const { saveUserPlaylist } = require('../services/playlistStore');
+const { scheduleRoomSave, flushRoomSave, hydrateRoom } = require('../services/roomStore');
+const { getBootMeta } = require('../services/serverBoot');
 const {
   toggleTestUsers,
   isTestUsersEnabled,
@@ -12,6 +14,19 @@ const {
 const room = new Room();
 const chatLastSent = new Map();
 const CHAT_COOLDOWN_MS = 800;
+let ioRef = null;
+
+function withBootMeta(payload = {}) {
+  return { ...payload, ...getBootMeta() };
+}
+
+function getPlayerSyncPayload() {
+  return withBootMeta(room.getPlayerSync());
+}
+
+function getRoomStatePayload() {
+  return withBootMeta(room.getRoomState());
+}
 
 function syncPlaylistFor(io, socketId) {
   if (!socketId) return;
@@ -29,8 +44,9 @@ function broadcast(io) {
 }
 
 function emitPlayerSync(io) {
-  io.emit('player:sync', room.getPlayerSync());
+  io.emit('player:sync', getPlayerSyncPayload());
   notifyTrackStarted(room, () => broadcastRoom(io));
+  scheduleRoomSave(room);
 }
 
 async function handleTrackEnded(io, playlistSyncFor) {
@@ -44,7 +60,8 @@ async function handleTrackEnded(io, playlistSyncFor) {
 
 /** Room updates (chat, online users, queue) — does not touch the YouTube player */
 function broadcastRoom(io) {
-  io.emit('room:state', room.getRoomState());
+  io.emit('room:state', getRoomStatePayload());
+  scheduleRoomSave(room);
 }
 
 function parseSocketAccount(auth = {}) {
@@ -77,7 +94,10 @@ function registerSockets(httpServer) {
       origin: true,
       credentials: true,
     },
+    pingInterval: 20000,
+    pingTimeout: 25000,
   });
+  ioRef = io;
 
   room.setTrackEndHandler((playlistSyncFor) => {
     void handleTrackEnded(io, playlistSyncFor);
@@ -97,14 +117,19 @@ function registerSockets(httpServer) {
       socket.data.authenticated = resolved.isAuthenticated;
 
       socket.emit('playlist:sync', room.getPlaylist(socket.id));
-      socket.emit('room:state', room.getRoomState());
-      socket.emit('player:sync', room.getPlayerSync());
+      socket.emit('room:state', getRoomStatePayload());
+      socket.emit('player:sync', getPlayerSyncPayload());
       broadcast(io);
     } catch (err) {
       console.error('[socket] connection setup failed:', err.message);
       socket.disconnect(true);
       return;
     }
+
+    socket.on('room:requestSync', () => {
+      socket.emit('room:state', getRoomStatePayload());
+      socket.emit('player:sync', getPlayerSyncPayload());
+    });
 
     socket.on('user:setName', ({ name }, ack) => {
       const user = room.users.get(socket.id);
@@ -294,10 +319,29 @@ function registerSockets(httpServer) {
       syncPlaylistFor(io, playlistSyncFor);
       broadcast(io);
       if (hadNowPlaying && (wasDj || !room.nowPlaying)) emitPlayerSync(io);
+      else scheduleRoomSave(room);
     });
   });
 
   return io;
 }
 
-module.exports = { registerSockets, room };
+async function initRoomFromStore() {
+  const restored = await hydrateRoom(room);
+  if (restored && room.nowPlaying) {
+    notifyTrackStarted(room, ioRef ? () => broadcastRoom(ioRef) : null);
+  }
+  return restored;
+}
+
+function flushPersistedRoom() {
+  return flushRoomSave(room);
+}
+
+module.exports = {
+  registerSockets,
+  initRoomFromStore,
+  flushPersistedRoom,
+  room,
+  getBootMeta,
+};
