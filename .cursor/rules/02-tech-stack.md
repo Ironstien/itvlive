@@ -126,6 +126,8 @@ Use `express.json()`, CORS with `credentials: true`, origin from `CLIENT_ORIGIN`
 - **`broadcastRoom(io)`** → `room:state` only (chat/users/queue).
 - **`emitPlayerSync(io)`** → `player:sync` only when now playing changes.
 - Never emit `player:sync` on every chat message.
+- Only **logged-in users** (`userId`) may join the DJ queue or use playlists.
+- Queue membership is keyed by `userId` and survives disconnect until the user's song finishes while offline.
 
 ## Room service patterns (`server/services/room.js`)
 
@@ -147,7 +149,7 @@ Return shapes from mutations: `{ ok: true, ... }` or `{ error: 'message' }` — 
 ## Player client (`public/js/player.js`)
 
 - Global `ITVPlayer` IIFE wrapping YT IFrame API.
-- `sync(payload)` — signature `videoId:startedAt`; seek if drift **> 12s**; do not restart same track unnecessarily.
+- `sync(payload)` — signature `videoId:startedAt`; seek using `serverTime - startedAt`; drift **> 5s**; do not restart same track unnecessarily.
 - `setOnEnded(fn)` — backup end detection; server timer is primary (Phase 0+).
 
 ## Mongoose models (target schema)

@@ -367,6 +367,25 @@
   border-bottom: 1px solid rgba(45, 45, 66, 0.5);
 }
 
+.queue-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.queue-kick {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.4rem;
+}
+
+.panel-playlist--guest .playlist-form,
+.panel-playlist--guest .playlist-io {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .queue-now {
   color: var(--purple-bright);
   font-weight: 600;

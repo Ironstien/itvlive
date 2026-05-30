@@ -8,42 +8,42 @@ const SAVE_DEBOUNCE_MS = 400;
 let saveTimer = null;
 let saveInFlight = null;
 
-function collectPersistSocketIds(room) {
+function collectPersistUserIds(room) {
   const ids = new Set();
-  if (room.nowPlaying?.socketId) ids.add(room.nowPlaying.socketId);
+  if (room.nowPlaying?.userId) ids.add(String(room.nowPlaying.userId));
   for (const entry of room.globalQueue) {
-    if (entry?.socketId) ids.add(entry.socketId);
+    if (entry?.userId) ids.add(String(entry.userId));
   }
   return ids;
 }
 
 function roomToSnapshot(room) {
-  const persistSocketIds = collectPersistSocketIds(room);
+  const persistUserIds = collectPersistUserIds(room);
   const users = [];
   const playlists = {};
 
-  for (const socketId of persistSocketIds) {
-    const user = room.users.get(socketId);
-    if (user) {
+  for (const userId of persistUserIds) {
+    const member = room.membersByUserId?.get(userId);
+    if (member) {
       users.push({
-        socketId: user.socketId,
-        userId: user.userId ?? null,
-        displayName: user.displayName,
-        level: user.level ?? 1,
-        staffRole: user.staffRole ?? null,
-        emailVerified: user.emailVerified === true,
-        avatarUrl: user.avatarUrl ?? null,
-        customSaying: user.customSaying ?? '',
-        badges: Array.isArray(user.badges) ? [...user.badges] : [],
-        role: user.role ?? 'user',
-        inQueue: user.inQueue === true,
-        connectedAt: user.connectedAt ?? null,
+        userId: member.userId,
+        socketId: member.socketId ?? null,
+        displayName: member.displayName,
+        level: member.level ?? 1,
+        staffRole: member.staffRole ?? null,
+        emailVerified: member.emailVerified === true,
+        avatarUrl: member.avatarUrl ?? null,
+        customSaying: member.customSaying ?? '',
+        badges: Array.isArray(member.badges) ? [...member.badges] : [],
+        role: member.role ?? 'user',
+        inQueue: member.inQueue === true,
+        connectedAt: member.connectedAt ?? null,
       });
     }
 
-    const pl = room.playlists.get(socketId);
+    const pl = room.playlistsByUserId?.get(userId);
     if (pl?.length) {
-      playlists[socketId] = pl.map((item) => ({ ...item }));
+      playlists[userId] = pl.map((item) => ({ ...item }));
     }
   }
 

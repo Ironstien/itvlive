@@ -34,9 +34,15 @@ const ITVPlayer = (() => {
     return `${payload.videoId}:${payload.startedAt || 0}`;
   }
 
+  const SEEK_DRIFT_SEC = 5;
+
   function computeSeekSec(payload) {
     if (!payload?.startedAt) return 0;
-    return Math.max(0, Math.floor((Date.now() - payload.startedAt) / 1000));
+    const refTime =
+      payload.serverTime != null && Number.isFinite(Number(payload.serverTime))
+        ? Number(payload.serverTime)
+        : Date.now();
+    return Math.max(0, Math.floor((refTime - payload.startedAt) / 1000));
   }
 
   function unblockEl() {
@@ -82,7 +88,7 @@ const ITVPlayer = (() => {
 
       if (seekSec != null && typeof ytPlayer.getCurrentTime === 'function' && ytPlayer.seekTo) {
         const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
-        if (drift > 2) {
+        if (drift > SEEK_DRIFT_SEC) {
           ytPlayer.seekTo(seekSec, true);
         }
       }
@@ -117,7 +123,7 @@ const ITVPlayer = (() => {
   function seekIfNeeded(seekSec) {
     if (!ytPlayer?.seekTo || !ytPlayer?.getCurrentTime) return;
     const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
-    if (drift > 2) {
+    if (drift > SEEK_DRIFT_SEC) {
       ytPlayer.seekTo(seekSec, true);
     }
   }
@@ -314,8 +320,11 @@ const ITVPlayer = (() => {
     const seekSec = payload?.videoId ? computeSeekSec(payload) : 0;
 
     if (signature === lastSyncSignature) {
-      if (payload?.videoId && (!isAlreadyPlaying() || isStalledAtStart(seekSec))) {
-        nudgePlayback(payload);
+      if (payload?.videoId) {
+        seekIfNeeded(seekSec);
+        if (!isAlreadyPlaying() || isStalledAtStart(seekSec)) {
+          nudgePlayback(payload);
+        }
       }
       return;
     }

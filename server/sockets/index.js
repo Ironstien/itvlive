@@ -14,6 +14,8 @@ const {
 
 const room = new Room();
 const chatLastSent = new Map();
+/** @type {Map<string, string>} userId → active socketId */
+const activeUserSockets = new Map();
 const CHAT_COOLDOWN_MS = 800;
 let ioRef = null;
 
@@ -29,15 +31,23 @@ function getRoomStatePayload() {
   return withBootMeta(room.getRoomState());
 }
 
-function syncPlaylistFor(io, socketId) {
+function resolveUserId(userIdOrSocketId) {
+  if (!userIdOrSocketId) return null;
+  const key = String(userIdOrSocketId);
+  if (room.membersByUserId?.has(key)) return key;
+  return room.getUserId(key) || null;
+}
+
+function syncPlaylistFor(io, userIdOrSocketId) {
+  const userId = resolveUserId(userIdOrSocketId);
+  if (!userId) return;
+  const socketId = room._liveSocketForUserId(userId);
   if (!socketId) return;
-  const playlist = room.getPlaylist(socketId);
+  const playlist = room.getPlaylistForUserId(userId);
   const target = io.sockets.sockets.get(socketId);
   if (target) {
     target.emit('playlist:sync', playlist);
-    return;
   }
-  io.to(socketId).emit('playlist:sync', playlist);
 }
 
 function broadcast(io) {
@@ -79,15 +89,15 @@ function parseSocketAccount(auth = {}) {
   return account;
 }
 
-async function persistPlaylist(socketId) {
-  const userId = room.getUserId(socketId);
+async function persistPlaylist(userIdOrSocketId) {
+  const userId = resolveUserId(userIdOrSocketId);
   if (!userId) return;
   if (!isDbConnected()) {
     console.warn('[playlist] skip persist — database not connected');
     return;
   }
   try {
-    const items = room.getPlaylist(socketId);
+    const items = room.getPlaylistForUserId(userId);
     await saveUserPlaylist(userId, items);
   } catch (err) {
     console.error('[playlist] persist failed:', err.message);
@@ -99,7 +109,7 @@ async function restoreUserPlaylist(socketId) {
   if (!userId || !isDbConnected()) return room.getPlaylist(socketId);
   try {
     const saved = await loadUserPlaylist(userId);
-    room.setPlaylist(socketId, saved);
+    room.setPlaylistForUserId(userId, saved);
     return saved;
   } catch (err) {
     console.error('[playlist] restore failed:', err.message);
@@ -128,12 +138,32 @@ function registerSockets(httpServer) {
       const displayName =
         resolved.displayName || `Guest-${socket.id.slice(0, 4)}`;
 
+      const userId = resolved.account?.userId ? String(resolved.account.userId) : null;
+      if (userId) {
+        const existingSocketId = activeUserSockets.get(userId);
+        if (existingSocketId && existingSocketId !== socket.id) {
+          const existing = io.sockets.sockets.get(existingSocketId);
+          if (existing) {
+            socket.emit('room:error', {
+              error: 'This account is already open in another tab. Close it first.',
+            });
+            socket.disconnect(true);
+            return;
+          }
+          activeUserSockets.delete(userId);
+        }
+        activeUserSockets.set(userId, socket.id);
+      }
+
       room.addUser(socket.id, displayName, resolved.account);
-      room.setPlaylist(socket.id, resolved.playlist ?? []);
+      if (userId) {
+        room.setPlaylistForUserId(userId, resolved.playlist ?? []);
+      }
 
       socket.data.authenticated = resolved.isAuthenticated;
+      socket.data.userId = userId;
 
-      socket.emit('playlist:sync', room.getPlaylist(socket.id));
+      socket.emit('playlist:sync', userId ? room.getPlaylistForUserId(userId) : []);
       socket.emit('room:state', getRoomStatePayload());
       socket.emit('player:sync', getPlayerSyncPayload());
       broadcast(io);
@@ -144,7 +174,8 @@ function registerSockets(httpServer) {
     }
 
     socket.on('room:requestSync', async () => {
-      const playlist = await restoreUserPlaylist(socket.id);
+      const userId = room.getUserId(socket.id);
+      const playlist = userId ? await restoreUserPlaylist(socket.id) : [];
       socket.emit('playlist:sync', playlist);
       socket.emit('room:state', getRoomStatePayload());
       socket.emit('player:sync', getPlayerSyncPayload());
@@ -166,8 +197,10 @@ function registerSockets(httpServer) {
     socket.on('user:attachAccount', async (payload, ack) => {
       const result = room.attachUserAccount(socket.id, parseSocketAccount(payload));
       if (result.ok && room.getUserId(socket.id)) {
+        const userId = room.getUserId(socket.id);
+        activeUserSockets.set(userId, socket.id);
         const playlist = await restoreUserPlaylist(socket.id);
-        await persistPlaylist(socket.id);
+        await persistPlaylist(userId);
         socket.emit('playlist:sync', playlist);
       }
       if (typeof ack === 'function') ack(result);
@@ -236,7 +269,8 @@ function registerSockets(httpServer) {
           syncPlaylistFor(io, result.playlistSyncFor);
         }
         broadcast(io);
-        emitPlayerSync(io);
+        if (result.playerChanged) emitPlayerSync(io);
+        else scheduleRoomSave(room);
       }
     });
 
@@ -244,9 +278,8 @@ function registerSockets(httpServer) {
       const result = room.leaveQueue(socket.id);
       if (typeof ack === 'function') ack(result);
       if (result.ok) {
-        syncPlaylistFor(io, result.playlistSyncFor);
         broadcast(io);
-        if (result.playlistSyncFor) emitPlayerSync(io);
+        scheduleRoomSave(room);
       }
     });
 
@@ -263,6 +296,15 @@ function registerSockets(httpServer) {
         syncPlaylistFor(io, result.playlistSyncFor);
         broadcast(io);
         emitPlayerSync(io);
+      }
+    });
+
+    socket.on('queue:mod-kick', ({ targetUserId }, ack) => {
+      const result = room.modKickFromQueue(socket.id, targetUserId);
+      if (typeof ack === 'function') ack(result);
+      if (result.ok) {
+        broadcast(io);
+        scheduleRoomSave(room);
       }
     });
 
@@ -335,15 +377,14 @@ function registerSockets(httpServer) {
       chatLastSent.delete(socket.id);
       const userId = room.getUserId(socket.id);
       if (userId) {
-        await persistPlaylist(socket.id);
+        await persistPlaylist(userId);
+        if (activeUserSockets.get(userId) === socket.id) {
+          activeUserSockets.delete(userId);
+        }
       }
-      const hadNowPlaying = !!room.nowPlaying;
-      const wasDj = room.nowPlaying?.socketId === socket.id;
-      const { playlistSyncFor = null } = room.removeUser(socket.id);
-      syncPlaylistFor(io, playlistSyncFor);
+      room.markUserDisconnected(socket.id);
       broadcast(io);
-      if (hadNowPlaying && (wasDj || !room.nowPlaying)) emitPlayerSync(io);
-      else scheduleRoomSave(room);
+      scheduleRoomSave(room);
     });
   });
 

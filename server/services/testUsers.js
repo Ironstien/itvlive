@@ -36,7 +36,7 @@ function clearChatTimers() {
 
 function buildBotAccount(profile) {
   return {
-    userId: null,
+    userId: `test:${profile.id}`,
     displayName: profile.displayName,
     level: profile.level ?? 1,
     staffRole: profile.staffRole ?? null,
@@ -159,7 +159,8 @@ function disableTestUsers(room) {
   const botIds = [...room.users.keys()].filter(isTestSocketId);
 
   for (const socketId of botIds) {
-    const result = room.removeUser(socketId);
+    const userId = room.getUserId(socketId) || socketId;
+    const result = room.purgeMember(userId);
     if (result.playlistSyncFor) {
       playlistSyncFor = result.playlistSyncFor;
     }
