@@ -126,15 +126,13 @@ const ITVPlayer = (() => {
 
     if (!payload?.startedAt) return 0;
 
-    const refTime =
+    // Always use the live server clock estimate. payload.serverTime is a snapshot
 
-      payload.serverTime != null && Number.isFinite(Number(payload.serverTime))
+    // from the last sync/tick; using it here freezes seekSec and causes ~10s false
 
-        ? Number(payload.serverTime)
+    // drift (then periodic seek/resync skips). Clock offset is set via updateClockOffset.
 
-        : serverNowMs();
-
-    return Math.max(0, Math.floor((refTime - payload.startedAt) / 1000));
+    return Math.max(0, Math.floor((serverNowMs() - payload.startedAt) / 1000));
 
   }
 
@@ -244,7 +242,19 @@ const ITVPlayer = (() => {
 
         logPlayer('warn', 'Drift exceeds resync threshold', { drift, seekSec });
 
-        onResyncRequestCallback?.();
+        seekIfNeeded(seekSec);
+
+        if (
+
+          ytPlayer?.getCurrentTime &&
+
+          Math.abs(ytPlayer.getCurrentTime() - seekSec) > RESYNC_DRIFT_SEC
+
+        ) {
+
+          onResyncRequestCallback?.();
+
+        }
 
         return;
 
