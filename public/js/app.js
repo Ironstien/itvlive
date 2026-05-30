@@ -129,6 +129,10 @@
     return role === 'mod' || role === 'admin';
   }
 
+  function isAdminUser() {
+    return loggedInUser?.staffRole === 'admin';
+  }
+
   function isCurrentDj(state) {
     const uid = myUserId();
     if (!uid || !state?.nowPlaying?.userId) return false;
@@ -344,11 +348,13 @@
       if (loggedInUser) {
         renderNavUser({ user: loggedInUser });
         updateGuestPlaylistAccess();
+        updateResetServerButton();
       } else {
         renderNavUser({
           guestName: displayName,
         });
         updateGuestPlaylistAccess();
+        updateResetServerButton();
         socket.emit('user:setName', { name: displayName });
       }
     });
@@ -467,6 +473,12 @@
     btn.classList.toggle('is-active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     updateSkipTestTrackButton(state);
+  }
+
+  function updateResetServerButton() {
+    const btn = $('#btn-reset-server');
+    if (!btn) return;
+    show(btn, isAdminUser());
   }
 
   function isTestUserSocketId(socketId) {
@@ -617,6 +629,7 @@
     updateQueueButton(state);
     updateAirSign(state);
     updateTestUsersButton(state);
+    updateResetServerButton();
   }
 
   function formatDuration(seconds) {
@@ -1141,6 +1154,29 @@
     });
   });
 
+  $('#btn-reset-server')?.addEventListener('click', () => {
+    if (!requireSocket()) return;
+    if (!isAdminUser()) {
+      toast('Admin permissions required', true);
+      return;
+    }
+    const confirmed = window.confirm(
+      'Reset the live room?\n\nThis stops playback, clears the DJ queue, and removes test users if they are enabled.'
+    );
+    if (!confirmed) return;
+
+    const btn = $('#btn-reset-server');
+    if (btn) btn.disabled = true;
+    socket.emit('dev:resetServer', {}, (res) => {
+      if (btn) btn.disabled = false;
+      if (res?.error) {
+        toast(res.error, true);
+        return;
+      }
+      toast('Server reset — queue cleared, playback stopped');
+    });
+  });
+
   $('#btn-skip-test-track')?.addEventListener('click', () => {
     if (!requireSocket()) return;
     const btn = $('#btn-skip-test-track');
@@ -1263,6 +1299,7 @@
       onUserUpdate: (user) => {
         loggedInUser = user;
         renderNavUser({ user });
+        updateResetServerButton();
       },
       onLogout: () => {
         if (socket?.connected) socket.disconnect();

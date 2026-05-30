@@ -57,6 +57,22 @@ class Room {
     return false;
   }
 
+  /** Stop playback, clear the DJ queue, and reset queue membership flags. */
+  resetServer() {
+    this._clearTrackEndTimer();
+    this.nowPlaying = null;
+    this.globalQueue = [];
+
+    for (const member of this.membersByUserId.values()) {
+      member.inQueue = false;
+    }
+    for (const user of this.users.values()) {
+      user.inQueue = false;
+    }
+
+    return { ok: true };
+  }
+
   _requireUserId(user) {
     return user?.userId ? String(user.userId) : null;
   }

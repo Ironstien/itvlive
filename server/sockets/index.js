@@ -11,16 +11,13 @@ const { scheduleRoomSave, flushRoomSave, hydrateRoom } = require('../services/ro
 const { isDbConnected } = require('../config/db');
 
 const { getBootMeta } = require('../services/serverBoot');
+const { isAdmin } = require('../config/permissions');
 const {
-
   toggleTestUsers,
-
   isTestUsersEnabled,
-
   notifyTrackStarted,
-
   skipCurrentTestUserTrack,
-
+  disableTestUsers,
 } = require('../services/testUsers');
 
 
@@ -989,6 +986,32 @@ function registerSockets(httpServer) {
 
       }
 
+    });
+
+
+
+    socket.on('dev:resetServer', async (_payload, ack) => {
+      const user = room.users.get(socket.id);
+      if (!isAdmin(user)) {
+        if (typeof ack === 'function') ack({ error: 'Admin permissions required' });
+        return;
+      }
+
+      try {
+        if (isTestUsersEnabled()) {
+          disableTestUsers(room);
+        }
+        room.resetServer();
+        stopPlayerTick();
+        broadcast(io);
+        emitPlayerSync(io);
+        await flushRoomSave(room);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        if (typeof ack === 'function') {
+          ack({ error: err.message || 'Failed to reset server' });
+        }
+      }
     });
 
 

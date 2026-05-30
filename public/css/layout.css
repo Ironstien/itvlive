@@ -177,6 +177,35 @@ a:hover {
   box-shadow: var(--shadow-glow);
 }
 
+.btn-reset-server {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(180, 60, 60, 0.45);
+  border-radius: var(--radius);
+  background: rgba(40, 16, 16, 0.9);
+  color: #e8a0a0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.btn-reset-server:hover {
+  color: #ffc8c8;
+  border-color: rgba(220, 80, 80, 0.65);
+  background: rgba(60, 20, 20, 0.95);
+}
+
+.btn-reset-server:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .btn-nav-log {
   padding: 0.28rem 0.55rem;
   border: 1px solid var(--void-border);
