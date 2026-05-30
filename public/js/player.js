@@ -5,10 +5,12 @@ const ITVPlayer = (() => {
   let ready = false;
   let currentVideoId = null;
   let lastSyncSignature = null;
+  let lastSyncPayload = null;
   let onEndedCallback = null;
   let volumeLevel = 80;
   let volumeMuted = false;
   let expectPlaying = false;
+  let autoplayMuteTrick = false;
   let playRetryTimer = null;
   let pendingSyncPayload = null;
   const queue = [];
@@ -32,6 +34,11 @@ const ITVPlayer = (() => {
     return `${payload.videoId}:${payload.startedAt || 0}`;
   }
 
+  function computeSeekSec(payload) {
+    if (!payload?.startedAt) return 0;
+    return Math.max(0, Math.floor((Date.now() - payload.startedAt) / 1000));
+  }
+
   function unblockEl() {
     return document.getElementById('player-unblock');
   }
@@ -53,67 +60,118 @@ const ITVPlayer = (() => {
     }
   }
 
-  function schedulePlayRetry(reason) {
+  function beginAutoplayMuteTrick() {
+    autoplayMuteTrick = !volumeMuted && volumeLevel > 0;
+    if (autoplayMuteTrick && ytPlayer?.mute) {
+      ytPlayer.mute();
+    }
+  }
+
+  function restoreVolumeAfterAutoplay() {
+    if (!autoplayMuteTrick) return;
+    autoplayMuteTrick = false;
+    applyVolume();
+  }
+
+  function schedulePlayRetry(reason, seekSec = null) {
     clearPlayRetry();
     playRetryTimer = setTimeout(() => {
       playRetryTimer = null;
       if (!expectPlaying || !ytPlayer?.playVideo) return;
       const state = ytPlayer.getPlayerState?.();
+
+      if (seekSec != null && typeof ytPlayer.getCurrentTime === 'function' && ytPlayer.seekTo) {
+        const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
+        if (drift > 2) {
+          ytPlayer.seekTo(seekSec, true);
+        }
+      }
+
       if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) {
         hideUnblockOverlay();
         return;
       }
+
       logPlayer('warn', 'Play retry', { reason, videoId: currentVideoId, stateCode: state });
+      beginAutoplayMuteTrick();
       try {
         ytPlayer.playVideo();
       } catch (err) {
         logPlayer('warn', 'playVideo failed', { message: err?.message || String(err) });
       }
-      if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.CUED) {
+
+      if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.CUED || state === -1) {
         showUnblockOverlay();
       }
-    }, 500);
+    }, 400);
   }
 
-  function markExpectPlaying() {
+  function markExpectPlaying(seekSec = null) {
     expectPlaying = true;
-    schedulePlayRetry('mark');
+    schedulePlayRetry('mark', seekSec);
     setTimeout(() => {
-      if (expectPlaying) schedulePlayRetry('mark-delayed');
-    }, 1500);
+      if (expectPlaying) schedulePlayRetry('mark-delayed', seekSec);
+    }, 1200);
+  }
+
+  function seekIfNeeded(seekSec) {
+    if (!ytPlayer?.seekTo || !ytPlayer?.getCurrentTime) return;
+    const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
+    if (drift > 2) {
+      ytPlayer.seekTo(seekSec, true);
+    }
+  }
+
+  function loadAndPlay(videoId, seekSec, reason) {
+    if (!ytPlayer?.loadVideoById) return false;
+
+    logPlayer('info', reason, {
+      videoId,
+      seekSec,
+    });
+
+    currentVideoId = videoId;
+    beginAutoplayMuteTrick();
+    markExpectPlaying(seekSec);
+
+    ytPlayer.loadVideoById({
+      videoId,
+      startSeconds: seekSec,
+    });
+
+    setTimeout(() => {
+      if (!ytPlayer?.playVideo) return;
+      seekIfNeeded(seekSec);
+      ytPlayer.playVideo();
+      schedulePlayRetry('post-load', seekSec);
+    }, 150);
+
+    return true;
   }
 
   function nudgePlayback(payload) {
     if (!payload?.videoId) return;
 
-    const seekSec = payload.startedAt
-      ? Math.max(0, Math.floor((Date.now() - payload.startedAt) / 1000))
-      : 0;
+    const seekSec = computeSeekSec(payload);
 
     whenReady(() => {
       ensurePlayer();
       if (!ytPlayer) return;
 
-      if (currentVideoId !== payload.videoId && ytPlayer.loadVideoById) {
-        currentVideoId = payload.videoId;
-        markExpectPlaying();
-        ytPlayer.loadVideoById(payload.videoId, seekSec);
+      if (currentVideoId !== payload.videoId) {
+        loadAndPlay(payload.videoId, seekSec, 'Loading new video (nudge)');
         return;
       }
 
-      if (typeof ytPlayer.getCurrentTime === 'function') {
-        const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
-        if (drift > 12 && ytPlayer.seekTo) {
-          ytPlayer.seekTo(seekSec, true);
-        }
-      }
+      seekIfNeeded(seekSec);
 
       if (!isAlreadyPlaying()) {
         logPlayer('warn', 'Nudging playback — duplicate sync but not playing', {
           videoId: currentVideoId,
           seekSec,
         });
-        markExpectPlaying();
+        beginAutoplayMuteTrick();
+        markExpectPlaying(seekSec);
         ytPlayer.playVideo?.();
       }
     });
@@ -170,14 +228,20 @@ const ITVPlayer = (() => {
             expectPlaying = false;
             clearPlayRetry();
             hideUnblockOverlay();
+            restoreVolumeAfterAutoplay();
           }
 
           if (
             expectPlaying &&
-            (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.CUED)
+            (event.data === YT.PlayerState.PAUSED ||
+              event.data === YT.PlayerState.CUED ||
+              event.data === -1)
           ) {
-            schedulePlayRetry('state-change');
-            showUnblockOverlay();
+            const seekSec = lastSyncPayload ? computeSeekSec(lastSyncPayload) : null;
+            schedulePlayRetry('state-change', seekSec);
+            if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.CUED) {
+              showUnblockOverlay();
+            }
           }
 
           if (event.data === YT.PlayerState.PAUSED && !expectPlaying) {
@@ -229,6 +293,16 @@ const ITVPlayer = (() => {
     return state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING;
   }
 
+  function isStalledAtStart(seekSec) {
+    if (!ytPlayer?.getPlayerState || !ytPlayer?.getCurrentTime) return false;
+    const state = ytPlayer.getPlayerState();
+    if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) {
+      return false;
+    }
+    if (seekSec <= 0) return state === YT.PlayerState.CUED || state === -1;
+    return ytPlayer.getCurrentTime() < Math.max(1, seekSec - 3);
+  }
+
   function sync(payload) {
     if (!ready || typeof YT === 'undefined') {
       pendingSyncPayload = payload;
@@ -237,8 +311,10 @@ const ITVPlayer = (() => {
     }
 
     const signature = syncSignature(payload);
+    const seekSec = payload?.videoId ? computeSeekSec(payload) : 0;
+
     if (signature === lastSyncSignature) {
-      if (payload?.videoId && !isAlreadyPlaying()) {
+      if (payload?.videoId && (!isAlreadyPlaying() || isStalledAtStart(seekSec))) {
         nudgePlayback(payload);
       }
       return;
@@ -249,11 +325,13 @@ const ITVPlayer = (() => {
       signature,
       videoId: payload?.videoId || null,
       startedAt: payload?.startedAt || null,
+      seekSec,
     });
 
     const idleEl = document.getElementById('player-idle');
     if (!payload?.videoId) {
       logPlayer('info', 'ITVPlayer.sync idle — no video', { previousVideoId: currentVideoId });
+      lastSyncPayload = null;
       expectPlaying = false;
       clearPlayRetry();
       hideUnblockOverlay();
@@ -266,12 +344,9 @@ const ITVPlayer = (() => {
       return;
     }
 
+    lastSyncPayload = payload;
     if (idleEl) idleEl.classList.add('hidden');
     hideUnblockOverlay();
-
-    const seekSec = payload.startedAt
-      ? Math.max(0, Math.floor((Date.now() - payload.startedAt) / 1000))
-      : 0;
 
     whenReady(() => {
       ensurePlayer();
@@ -283,36 +358,20 @@ const ITVPlayer = (() => {
         }
 
         if (currentVideoId !== payload.videoId) {
-          logPlayer('info', 'Loading new video', {
-            from: currentVideoId,
-            to: payload.videoId,
-            seekSec,
-          });
-          currentVideoId = payload.videoId;
-          markExpectPlaying();
-          ytPlayer.loadVideoById(payload.videoId, seekSec);
+          loadAndPlay(payload.videoId, seekSec, 'Loading new video');
           return;
         }
 
-        // Same track already loaded — only fix large drift; do not restart playback
-        if (typeof ytPlayer.getCurrentTime === 'function') {
-          const drift = Math.abs(ytPlayer.getCurrentTime() - seekSec);
-          if (drift > 12) {
-            logPlayer('warn', 'Seeking to fix drift', {
-              videoId: currentVideoId,
-              driftSec: Math.round(drift),
-              seekSec,
-            });
-            ytPlayer.seekTo(seekSec, true);
-          }
-        }
-        if (!isAlreadyPlaying()) {
-          logPlayer('warn', 'Resuming playback — player not playing', {
+        seekIfNeeded(seekSec);
+
+        if (!isAlreadyPlaying() || isStalledAtStart(seekSec)) {
+          logPlayer('warn', 'Resuming playback — join mid-track or stalled at start', {
             videoId: currentVideoId,
             seekSec,
           });
-          markExpectPlaying();
-          ytPlayer.playVideo();
+          beginAutoplayMuteTrick();
+          markExpectPlaying(seekSec);
+          ytPlayer.playVideo?.();
         }
       };
 
@@ -321,10 +380,12 @@ const ITVPlayer = (() => {
   }
 
   function userPlay() {
+    const seekSec = lastSyncPayload ? computeSeekSec(lastSyncPayload) : 0;
     whenReady(() => {
       ensurePlayer();
       if (!ytPlayer?.playVideo) return;
-      markExpectPlaying();
+      seekIfNeeded(seekSec);
+      markExpectPlaying(seekSec);
       ytPlayer.playVideo();
       hideUnblockOverlay();
     });

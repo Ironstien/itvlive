@@ -258,6 +258,13 @@
       if (reconnected) {
         toast('Reconnected — syncing room', false);
         socket.emit('room:requestSync');
+      } else {
+        // Late join: YT iframe may not be ready for the first player:sync — resync once loaded.
+        setTimeout(() => {
+          if (!socket?.connected) return;
+          ITVLog.debug('player', 'Late-join resync');
+          socket.emit('room:requestSync');
+        }, 1800);
       }
 
       if (loggedInUser) {
