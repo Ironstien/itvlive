@@ -566,11 +566,8 @@ class Room {
     const isCurrentDj =
       this.nowPlaying.userId === user?.userId ||
       this.nowPlaying.socketId === socketId;
-    const allowed =
-      can(user, ACTIONS.SKIP_OWN_NOW_PLAYING, { isCurrentDj }) ||
-      can(user, ACTIONS.SKIP_ANY_NOW_PLAYING);
-    if (!allowed) {
-      return { error: 'Only the current DJ or moderators can skip this song' };
+    if (!can(user, ACTIONS.SKIP_OWN_NOW_PLAYING, { isCurrentDj })) {
+      return { error: 'Only the current DJ can skip this song' };
     }
     const playlistSyncFor = this._finishCurrentTrack(this.nowPlaying.userId);
     return { ok: true, playlistSyncFor, playerChanged: true };

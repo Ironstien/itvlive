@@ -441,8 +441,6 @@
 
     if (isCurrentDj(state)) return 'skip';
 
-    if (isStaffUser() && state.nowPlaying?.videoId) return 'skip';
-
     if (amInQueue(state)) return 'leave';
 
     return 'join';
