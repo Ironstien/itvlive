@@ -80,10 +80,12 @@ const ITVPlayer = (() => {
   }
 
   function schedulePlayRetry(reason, seekSec = null) {
+    if (!shouldBePlaying() && !expectPlaying) return;
+    if (shouldBePlaying() && !expectPlaying) expectPlaying = true;
     clearPlayRetry();
     playRetryTimer = setTimeout(() => {
       playRetryTimer = null;
-      if (!expectPlaying || !ytPlayer?.playVideo) return;
+      if ((!shouldBePlaying() && !expectPlaying) || !ytPlayer?.playVideo) return;
       const state = ytPlayer.getPlayerState?.();
 
       if (seekSec != null && typeof ytPlayer.getCurrentTime === 'function' && ytPlayer.seekTo) {
@@ -93,7 +95,7 @@ const ITVPlayer = (() => {
         }
       }
 
-      if (state === YT.PlayerState.PLAYING || state === YT.PlayerState.BUFFERING) {
+      if (state === YT.PlayerState.PLAYING) {
         hideUnblockOverlay();
         return;
       }
@@ -106,7 +108,7 @@ const ITVPlayer = (() => {
         logPlayer('warn', 'playVideo failed', { message: err?.message || String(err) });
       }
 
-      if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.CUED || state === -1) {
+      if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING) {
         showUnblockOverlay();
       }
     }, 400);
@@ -234,14 +236,20 @@ const ITVPlayer = (() => {
       width: '100%',
       playerVars: {
         autoplay: 1,
+        mute: 1,
         controls: 1,
         rel: 0,
         modestbranding: 1,
         playsinline: 1,
+        enablejsapi: 1,
       },
       events: {
         onReady() {
-          applyVolume();
+          if (lastSyncPayload?.videoId && lastSyncPayload?.isPlaying !== false) {
+            beginAutoplayMuteTrick();
+          } else {
+            applyVolume();
+          }
           if (pendingSyncPayload) {
             const payload = pendingSyncPayload;
             pendingSyncPayload = null;
@@ -255,24 +263,33 @@ const ITVPlayer = (() => {
             stateCode: event.data,
           });
 
-          if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING) {
+          if (event.data === YT.PlayerState.PLAYING) {
             expectPlaying = false;
             clearPlayRetry();
             hideUnblockOverlay();
             restoreVolumeAfterAutoplay();
+            applyVolume();
+          }
+
+          if (
+            event.data === YT.PlayerState.CUED &&
+            shouldBePlaying() &&
+            !isAlreadyPlaying()
+          ) {
+            const seekSec = lastSyncPayload ? computeSeekSec(lastSyncPayload) : 0;
+            ensurePlaying(seekSec, 'cued');
           }
 
           if (
             shouldBePlaying() &&
+            !isAlreadyPlaying() &&
             (event.data === YT.PlayerState.PAUSED ||
               event.data === YT.PlayerState.CUED ||
               event.data === -1)
           ) {
             const seekSec = lastSyncPayload ? computeSeekSec(lastSyncPayload) : null;
             schedulePlayRetry('state-change', seekSec);
-            if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.CUED) {
-              showUnblockOverlay();
-            }
+            showUnblockOverlay();
           }
 
           if (event.data === YT.PlayerState.PAUSED && !shouldBePlaying() && !expectPlaying) {
@@ -304,7 +321,10 @@ const ITVPlayer = (() => {
       ytPlayer.mute?.();
       return;
     }
-    if (autoplayMuteTrick) {
+    if (autoplayMuteTrick || (shouldBePlaying() && !isAlreadyPlaying())) {
+      if (shouldBePlaying() && !isAlreadyPlaying()) {
+        autoplayMuteTrick = true;
+      }
       ytPlayer.mute?.();
       return;
     }
@@ -345,6 +365,7 @@ const ITVPlayer = (() => {
   function sync(payload) {
     if (!ready || typeof YT === 'undefined') {
       pendingSyncPayload = payload;
+      if (payload?.videoId) lastSyncPayload = payload;
       whenReady(() => ensurePlayer());
       return;
     }
@@ -388,6 +409,14 @@ const ITVPlayer = (() => {
 
     lastSyncPayload = payload;
     if (idleEl) idleEl.classList.add('hidden');
+
+    if (payload.isPlaying !== false) {
+      setTimeout(() => {
+        if (shouldBePlaying() && !isAlreadyPlaying()) {
+          showUnblockOverlay();
+        }
+      }, 900);
+    }
 
     whenReady(() => {
       ensurePlayer();
@@ -440,6 +469,19 @@ const ITVPlayer = (() => {
   function initUnblock() {
     const btn = document.getElementById('btn-player-unblock');
     btn?.addEventListener('click', () => userPlay());
+
+    const stack = document.getElementById('player-stack');
+    if (!stack || stack.dataset.unblockInit) return;
+    stack.dataset.unblockInit = '1';
+    stack.addEventListener(
+      'pointerdown',
+      () => {
+        if (shouldBePlaying() && !isAlreadyPlaying()) {
+          userPlay();
+        }
+      },
+      { capture: true }
+    );
   }
 
   return {
