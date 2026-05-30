@@ -62,6 +62,7 @@
   let hadConnectedOnce = false;
   let disconnectedAt = null;
   let pendingIdleResync = false;
+  let pendingUserPlay = false;
   let lastKnownBootId = sessionStorage.getItem(STORAGE_BOOT_ID) || null;
 
   // —— Tabs ——
@@ -237,11 +238,35 @@
       title: payload?.title || null,
       djName: payload?.djName || null,
       startedAt: payload?.startedAt || null,
+      playbackSessionId: payload?.playbackSessionId || null,
       bootId: payload?.bootId || null,
     });
     ITVPlayer.sync(payload);
-    ITVAmbient.sync(payload, () => ITVPlayer.getCurrentTime());
+    ITVAmbient.sync(payload, () => ITVPlayer.getServerSeekSec?.() ?? ITVPlayer.getCurrentTime());
     updateDjBanner(payload);
+    if (pendingUserPlay) {
+      pendingUserPlay = false;
+      ITVPlayer.userPlay?.();
+    }
+  }
+
+  function handlePlayerTick(payload) {
+    if (!payload?.videoId) return;
+    ITVPlayer.applyPlaybackHeartbeat?.(payload);
+    ITVAmbient.sync(
+      { ...lastSyncPayloadFromTick(payload), videoId: payload.videoId },
+      () => ITVPlayer.getServerSeekSec?.() ?? ITVPlayer.getCurrentTime()
+    );
+  }
+
+  function lastSyncPayloadFromTick(payload) {
+    return {
+      videoId: payload.videoId,
+      startedAt: payload.startedAt,
+      serverTime: payload.serverTime,
+      playbackSessionId: payload.playbackSessionId,
+      isPlaying: true,
+    };
   }
 
   async function fetchSavedPlaylist() {
@@ -375,6 +400,10 @@
 
     socket.on('player:sync', (payload) => {
       handlePlayerSync(payload);
+    });
+
+    socket.on('player:tick', (payload) => {
+      handlePlayerTick(payload);
     });
 
     socket.on('playlist:sync', (list) => {
@@ -1091,7 +1120,8 @@
       else {
         toast(action.ok);
         if (mode === 'join' || mode === 'skip') {
-          ITVPlayer.userPlay?.();
+          pendingUserPlay = true;
+          socket.emit('room:requestSync');
         }
       }
     });
@@ -1189,9 +1219,15 @@
     });
   }
 
+  ITVPlayer.setOnResyncRequest(() => {
+    if (socket?.connected) socket.emit('room:requestSync');
+  });
+
   ITVPlayer.setOnEnded(() => {
-    ITVLog.info('player', 'player:ended emit', { socketConnected: !!socket?.connected });
-    if (socket?.connected) socket.emit('player:ended');
+    if (!socket?.connected) return;
+    const payload = ITVPlayer.getEndedPayload?.() || {};
+    ITVLog.info('player', 'player:ended emit', payload);
+    socket.emit('player:ended', payload);
   });
 
   $('#btn-open-log')?.addEventListener('click', () => {

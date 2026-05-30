@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const {
   parseYoutubeId,
   extractPlaylistLineUrl,
@@ -9,8 +10,10 @@ const { isTestUsersEnabled } = require('./testUsers');
 
 const MAX_CHAT = 80;
 const MAX_MESSAGE_LEN = 280;
-/** When YouTube duration is unknown, server timer uses this fallback (seconds). */
+/** Legacy fallback — unknown durations no longer auto-advance on a timer. */
 const DEFAULT_TRACK_DURATION_SEC = 600;
+const TRACK_END_MIN_ELAPSED_RATIO = 0.8;
+const TRACK_END_NEAR_SEC = 8;
 
 class Room {
   constructor() {
@@ -28,10 +31,30 @@ class Room {
     this._lastFinishedAt = null;
     this._trackEndTimer = null;
     this._onTrackEnd = null;
+    this._onTrackStart = null;
   }
 
   setTrackEndHandler(fn) {
     this._onTrackEnd = typeof fn === 'function' ? fn : null;
+  }
+
+  setTrackStartHandler(fn) {
+    this._onTrackStart = typeof fn === 'function' ? fn : null;
+  }
+
+  _newPlaybackSessionId() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return `ps-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  /** In-memory playlist wins over DB while user is queued or on air. */
+  isPlaylistSessionCanonical(userId) {
+    if (!userId) return false;
+    const id = String(userId);
+    if (this.nowPlaying?.userId === id) return true;
+    const member = this._getMember(id);
+    if (member?.inQueue && this.playlistsByUserId.has(id)) return true;
+    return false;
   }
 
   _requireUserId(user) {
@@ -565,6 +588,74 @@ class Room {
     return this._finishCurrentTrack(this.nowPlaying.userId);
   }
 
+  validateClientTrackEnd(socketId, payload = {}) {
+    if (!this.nowPlaying) return { ok: false, reason: 'idle' };
+
+    const np = this.nowPlaying;
+    if (
+      payload.playbackSessionId &&
+      np.playbackSessionId &&
+      payload.playbackSessionId !== np.playbackSessionId
+    ) {
+      return { ok: false, reason: 'session_mismatch' };
+    }
+
+    const userId = this.getUserId(socketId);
+    const isCurrentDj = np.userId === userId || np.socketId === socketId;
+    const elapsedSec = (Date.now() - np.startedAt) / 1000;
+    const durationSec = this._knownDurationSec(np.durationSec);
+
+    if (durationSec != null) {
+      if (elapsedSec < durationSec * TRACK_END_MIN_ELAPSED_RATIO) {
+        return { ok: false, reason: 'too_early' };
+      }
+      const nearEndSec = Math.min(TRACK_END_NEAR_SEC, durationSec * 0.05);
+      const nearEnd =
+        elapsedSec >= durationSec - nearEndSec || elapsedSec >= durationSec * 0.95;
+      if (!nearEnd && !isCurrentDj) {
+        return { ok: false, reason: 'not_near_end' };
+      }
+    } else if (!isCurrentDj) {
+      return { ok: false, reason: 'unknown_duration_not_dj' };
+    }
+
+    return { ok: true };
+  }
+
+  onClientTrackEnded(socketId, payload = {}) {
+    const validation = this.validateClientTrackEnd(socketId, payload);
+    if (!validation.ok) return { ok: false, reason: validation.reason, playlistSyncFor: null };
+    const playlistSyncFor = this.onTrackEnded();
+    if (playlistSyncFor === null) {
+      return { ok: false, reason: 'deduped', playlistSyncFor: null };
+    }
+    return { ok: true, playlistSyncFor };
+  }
+
+  async refreshNowPlayingDuration() {
+    if (!this.nowPlaying?.videoId) return false;
+    try {
+      const meta = await fetchYoutubeMeta(this.nowPlaying.videoId);
+      const sec = this._knownDurationSec(meta.duration);
+      if (!sec || !this.nowPlaying) return false;
+      this.nowPlaying.durationSec = sec;
+      this.nowPlaying.durationSource = 'meta';
+      this._scheduleTrackEndTimer();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  updateNowPlayingDuration(durationSec, source = 'meta') {
+    if (!this.nowPlaying) return;
+    const sec = this._knownDurationSec(durationSec);
+    if (!sec) return;
+    this.nowPlaying.durationSec = sec;
+    this.nowPlaying.durationSource = source;
+    this._scheduleTrackEndTimer();
+  }
+
   _clearTrackEndTimer() {
     if (this._trackEndTimer) {
       clearTimeout(this._trackEndTimer);
@@ -572,17 +663,23 @@ class Room {
     }
   }
 
-  _resolveDurationSec(rawDuration) {
+  _knownDurationSec(rawDuration) {
     const n = Number(rawDuration);
     if (Number.isFinite(n) && n > 0) return Math.floor(n);
-    return DEFAULT_TRACK_DURATION_SEC;
+    return null;
+  }
+
+  _resolveDurationSec(rawDuration) {
+    return this._knownDurationSec(rawDuration);
   }
 
   _scheduleTrackEndTimer() {
     this._clearTrackEndTimer();
     if (!this.nowPlaying) return;
 
-    const durationSec = this._resolveDurationSec(this.nowPlaying.durationSec);
+    const durationSec = this._knownDurationSec(this.nowPlaying.durationSec);
+    if (!durationSec) return;
+
     const endAt = this.nowPlaying.startedAt + durationSec * 1000;
     const delay = Math.max(1000, endAt - Date.now());
 
@@ -664,7 +761,8 @@ class Room {
         continue;
       }
 
-      const durationSec = this._resolveDurationSec(head.duration);
+      const durationSec = this._knownDurationSec(head.duration);
+      const durationSource = durationSec ? 'meta' : 'unknown';
       const liveSocket = this._liveSocketForUserId(next.userId);
 
       this.nowPlaying = {
@@ -675,11 +773,17 @@ class Room {
         videoId: head.videoId,
         title: head.title,
         durationSec,
+        durationSource,
+        playbackSessionId: this._newPlaybackSessionId(),
+        playSessionId: null,
         startedAt: Date.now(),
       };
 
       this._moveQueueUserToBottom(next.userId);
       this._scheduleTrackEndTimer();
+      if (this._onTrackStart) {
+        this._onTrackStart(next.userId);
+      }
       return next.userId;
     }
 
@@ -728,6 +832,9 @@ class Room {
 
     if (snapshot.nowPlaying) {
       this.nowPlaying = { ...snapshot.nowPlaying };
+      if (!this.nowPlaying.playbackSessionId) {
+        this.nowPlaying.playbackSessionId = this._newPlaybackSessionId();
+      }
       if (!this.nowPlaying.userId && this.nowPlaying.socketId) {
         this.nowPlaying.userId = this.nowPlaying.socketId;
       }
@@ -751,7 +858,9 @@ class Room {
   recoverExpiredTrack() {
     let advanced = 0;
     while (this.nowPlaying) {
-      const durationSec = this._resolveDurationSec(this.nowPlaying.durationSec);
+      const durationSec = this._knownDurationSec(this.nowPlaying.durationSec);
+      if (!durationSec) break;
+
       const endAt = this.nowPlaying.startedAt + durationSec * 1000;
       if (Date.now() < endAt) break;
 
@@ -768,7 +877,7 @@ class Room {
     return advanced;
   }
 
-  getPlayerSync() {
+  _playbackPayloadBase() {
     const serverTime = Date.now();
     if (!this.nowPlaying) {
       return {
@@ -787,8 +896,29 @@ class Room {
       userId: this.nowPlaying.userId,
       startedAt: this.nowPlaying.startedAt,
       durationSec: this.nowPlaying.durationSec,
+      durationSource: this.nowPlaying.durationSource ?? null,
+      playbackSessionId: this.nowPlaying.playbackSessionId,
+      playSessionId: this.nowPlaying.playSessionId ?? null,
       isPlaying: true,
       serverTime,
+    };
+  }
+
+  getPlayerSync() {
+    return this._playbackPayloadBase();
+  }
+
+  getPlayerTick() {
+    if (!this.nowPlaying) return null;
+    const base = this._playbackPayloadBase();
+    return {
+      playbackSessionId: base.playbackSessionId,
+      playSessionId: base.playSessionId,
+      videoId: base.videoId,
+      startedAt: base.startedAt,
+      durationSec: base.durationSec,
+      serverTime: base.serverTime,
+      isPlaying: true,
     };
   }
 
@@ -857,6 +987,9 @@ class Room {
             videoId: this.nowPlaying.videoId,
             startedAt: this.nowPlaying.startedAt,
             durationSec: this.nowPlaying.durationSec,
+            durationSource: this.nowPlaying.durationSource ?? null,
+            playbackSessionId: this.nowPlaying.playbackSessionId ?? null,
+            playSessionId: this.nowPlaying.playSessionId ?? null,
           }
         : null,
       globalQueue: this.globalQueue.map((e) => ({
