@@ -14,7 +14,10 @@ async function connectDB() {
     return false;
   }
 
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 10_000,
+    connectTimeoutMS: 10_000,
+  });
   dbConnected = true;
   console.log('[db] Connected to MongoDB');
   return true;

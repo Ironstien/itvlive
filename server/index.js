@@ -96,13 +96,14 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 const httpServer = http.createServer(app);
 registerSockets(httpServer);
 
-async function start() {
+async function initDatabase() {
   try {
     await connectDB();
     await bootstrapAdminUser();
   } catch (err) {
     console.error('[db] Connection failed:', err.message);
-    process.exit(1);
+    console.warn('[db] Continuing in guest mode — fix MONGODB_URI to enable accounts');
+    return;
   }
 
   try {
@@ -110,17 +111,31 @@ async function start() {
   } catch (err) {
     console.error('[room] Restore failed:', err.message);
   }
+}
 
-  httpServer.listen(PORT, () => {
-    console.log('');
-    console.log(`  INTO THE VOID — Phase ${isDbConnected() ? 2 : 1}`);
-    console.log(`  Main Stage: http://localhost:${PORT}/index.html`);
-    console.log(`  Health:     http://localhost:${PORT}/health`);
-    console.log(`  Database:   ${isDbConnected() ? 'connected' : 'skipped (guest mode)'}`);
-    console.log(`  Boot ID:    ${getBootMeta().bootId}`);
-    console.log('');
-    console.log('  Tip: open two browser tabs to test chat and queue.');
-    console.log('');
+async function start() {
+  await new Promise((resolve, reject) => {
+    httpServer.once('error', reject);
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      httpServer.removeListener('error', reject);
+      resolve();
+    });
+  });
+
+  console.log('');
+  console.log(`  INTO THE VOID — Phase ${isDbConnected() ? 2 : 1}`);
+  console.log(`  Main Stage: http://localhost:${PORT}/index.html`);
+  console.log(`  Health:     http://localhost:${PORT}/health`);
+  console.log(`  Database:   ${isDbConnected() ? 'connected' : 'connecting…'}`);
+  console.log(`  Boot ID:    ${getBootMeta().bootId}`);
+  console.log('');
+  console.log('  Tip: open two browser tabs to test chat and queue.');
+  console.log('');
+
+  void initDatabase().then(() => {
+    if (isDbConnected()) {
+      console.log('[db] Ready — Phase 2 features enabled');
+    }
   });
 }
 
