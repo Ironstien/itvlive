@@ -10,7 +10,7 @@ const { isTestUsersEnabled } = require('./testUsers');
 
 const MAX_CHAT = 80;
 const MAX_MESSAGE_LEN = 280;
-/** Legacy fallback — unknown durations no longer auto-advance on a timer. */
+/** Fallback when metadata lookup fails — server timer still advances the queue. */
 const DEFAULT_TRACK_DURATION_SEC = 600;
 const TRACK_END_MIN_ELAPSED_RATIO = 0.8;
 
@@ -733,9 +733,9 @@ class Room {
     }
 
     const elapsedSec = (Date.now() - np.startedAt) / 1000;
-    const durationSec = this._knownDurationSec(np.durationSec);
+    const durationSec = this._effectiveDurationSec(np);
 
-    if (durationSec != null && elapsedSec < durationSec * TRACK_END_MIN_ELAPSED_RATIO) {
+    if (elapsedSec < durationSec * TRACK_END_MIN_ELAPSED_RATIO) {
       return { ok: false, reason: 'too_early' };
     }
 
@@ -793,24 +793,93 @@ class Room {
     return this._knownDurationSec(rawDuration);
   }
 
+  /** Known metadata duration, or DEFAULT fallback so the server timer always runs. */
+  _effectiveDurationSec(np = this.nowPlaying) {
+    return this._knownDurationSec(np?.durationSec) ?? DEFAULT_TRACK_DURATION_SEC;
+  }
+
+  async _lookupCachedSongDuration(videoId) {
+    if (!videoId) return null;
+    try {
+      const { isDbConnected } = require('../config/db');
+      if (!isDbConnected()) return null;
+      const Song = require('../models/Song');
+      const row = await Song.findOne({ youtubeId: videoId }).select('durationSec').lean();
+      return row?.durationSec > 0 ? Math.floor(row.durationSec) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Resolve track length and (re)schedule the authoritative server end timer.
+   * @returns {Promise<{ updated: boolean, durationSec?: number, source?: string }>}
+   */
+  async resolveNowPlayingDuration() {
+    if (!this.nowPlaying) return { updated: false };
+
+    const known = this._knownDurationSec(this.nowPlaying.durationSec);
+    if (known) {
+      this._scheduleTrackEndTimer();
+      return {
+        updated: false,
+        durationSec: known,
+        source: this.nowPlaying.durationSource || 'meta',
+      };
+    }
+
+    const cached = await this._lookupCachedSongDuration(this.nowPlaying.videoId);
+    if (cached) {
+      this.updateNowPlayingDuration(cached, 'cache');
+      return { updated: true, durationSec: cached, source: 'cache' };
+    }
+
+    try {
+      const meta = await fetchYoutubeMeta(this.nowPlaying.videoId);
+      const sec = this._knownDurationSec(meta.duration);
+      if (sec) {
+        this.updateNowPlayingDuration(sec, 'meta');
+        return { updated: true, durationSec: sec, source: 'meta' };
+      }
+    } catch (err) {
+      console.warn('[room] YouTube duration lookup failed:', err.message);
+    }
+
+    this._scheduleTrackEndTimer();
+    if (this.nowPlaying.durationSource !== 'fallback') {
+      this.nowPlaying.durationSource = 'fallback';
+    }
+    console.warn(
+      `[room] Unknown duration for ${this.nowPlaying.videoId} — queue will advance after ${DEFAULT_TRACK_DURATION_SEC}s`
+    );
+    return { updated: true, durationSec: DEFAULT_TRACK_DURATION_SEC, source: 'fallback' };
+  }
+
+  _fireTrackEndTimer() {
+    if (!this.nowPlaying) return;
+    const playlistSyncFor = this.onTrackEnded();
+    if (playlistSyncFor !== null && this._onTrackEnd) {
+      this._onTrackEnd(playlistSyncFor);
+    }
+  }
+
   _scheduleTrackEndTimer() {
     this._clearTrackEndTimer();
     if (!this.nowPlaying) return;
 
-    const durationSec = this._knownDurationSec(this.nowPlaying.durationSec);
-    if (!durationSec) return;
-
+    const durationSec = this._effectiveDurationSec();
     const endAt = this.nowPlaying.startedAt + durationSec * 1000;
-    const delay = Math.max(1000, endAt - Date.now());
+    const remaining = endAt - Date.now();
+
+    if (remaining <= 0) {
+      this._fireTrackEndTimer();
+      return;
+    }
 
     this._trackEndTimer = setTimeout(() => {
       this._trackEndTimer = null;
-      if (!this.nowPlaying) return;
-      const playlistSyncFor = this.onTrackEnded();
-      if (playlistSyncFor !== null && this._onTrackEnd) {
-        this._onTrackEnd(playlistSyncFor);
-      }
-    }, delay);
+      this._fireTrackEndTimer();
+    }, remaining);
   }
 
   _consumePlaylistHead(userId) {
@@ -985,9 +1054,7 @@ class Room {
   recoverExpiredTrack() {
     let advanced = 0;
     while (this.nowPlaying) {
-      const durationSec = this._knownDurationSec(this.nowPlaying.durationSec);
-      if (!durationSec) break;
-
+      const durationSec = this._effectiveDurationSec();
       const endAt = this.nowPlaying.startedAt + durationSec * 1000;
       if (Date.now() < endAt) break;
 

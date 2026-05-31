@@ -303,49 +303,21 @@ async function onTrackStarted(djUserId) {
 
 
 
-  if (!room.nowPlaying.durationSec) {
+  const resolved = await room.resolveNowPlayingDuration();
 
-    const cached = await lookupCachedSongDuration(room.nowPlaying.videoId);
+  if (resolved.updated && ioRef) {
 
-    if (cached) {
+    emitPlayerSync(ioRef);
 
-      room.updateNowPlayingDuration(cached, 'meta');
+  }
 
-    } else {
 
-      void room.refreshNowPlayingDuration().then((updated) => {
 
-        if (updated && room.nowPlaying) {
+  const np = room.nowPlaying;
 
-          void cacheSongDuration(
+  if (np?.durationSec && np.durationSource !== 'fallback') {
 
-            room.nowPlaying.videoId,
-
-            room.nowPlaying.title,
-
-            room.nowPlaying.durationSec
-
-          );
-
-          if (ioRef) emitPlayerSync(ioRef);
-
-        }
-
-      });
-
-    }
-
-  } else {
-
-    void cacheSongDuration(
-
-      room.nowPlaying.videoId,
-
-      room.nowPlaying.title,
-
-      room.nowPlaying.durationSec
-
-    );
+    void cacheSongDuration(np.videoId, np.title, np.durationSec);
 
   }
 
@@ -1378,6 +1350,8 @@ async function initRoomFromStore() {
       room.nowPlaying.playbackSessionId = room._newPlaybackSessionId();
 
     }
+
+    await onTrackStarted(room.nowPlaying.userId);
 
     notifyTrackStarted(room, ioRef ? () => broadcastRoom(ioRef) : null);
 
