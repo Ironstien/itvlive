@@ -67,16 +67,19 @@
 
     if (state.user) {
       const av = avatarImg(state.user, 'nav-avatar', 26);
-      const adminLink =
-        state.user.staffRole === 'admin'
-          ? ' · <a href="/admin.html">Admin</a>'
-          : '';
+      const role = state.user.staffRole;
+      let staffNav = '';
+      if (role === 'admin') {
+        staffNav = ' · <button type="button" class="link-btn" id="nav-open-admin">Admin</button>';
+      } else if (role === 'mod') {
+        staffNav = ' · <button type="button" class="link-btn" id="nav-open-admin">Staff</button>';
+      }
       container.innerHTML = `
         <span class="nav-user-inner">
           ${av}
           <button type="button" class="link-btn nav-username" id="nav-open-profile">${escapeHtml(state.user.username)}</button>
           · L${state.user.level || 1}
-          · <button type="button" class="link-btn" id="nav-open-settings">Settings</button>${adminLink}
+          · <button type="button" class="link-btn" id="nav-open-settings">Settings</button>${staffNav}
           · <a href="#" id="nav-logout" class="nav-logout">Log out</a>
         </span>
       `;
@@ -86,6 +89,10 @@
       };
       container.querySelector('#nav-open-profile')?.addEventListener('click', openProfile);
       container.querySelector('#nav-open-settings')?.addEventListener('click', openProfile);
+      container.querySelector('#nav-open-admin')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        state.onOpenAdmin?.();
+      });
       container.querySelector('#nav-logout')?.addEventListener('click', (e) => {
         e.preventDefault();
         clearAuth();

@@ -1,14 +1,16 @@
-(function () {
-  const $ = (sel) => document.querySelector(sel);
+(function (global) {
+  const show = (el, visible) => el?.classList.toggle('hidden', !visible);
 
-  function show(el, visible) {
-    if (!el) return;
-    el.classList.toggle('hidden', !visible);
+  let root = null;
+  let wired = false;
+
+  function qs(sel) {
+    return root?.querySelector(sel);
   }
 
   function setError(msg) {
-    const errEl = $('#admin-error');
-    const okEl = $('#admin-ok');
+    const errEl = qs('#admin-error');
+    const okEl = qs('#admin-ok');
     show(okEl, false);
     if (!msg) {
       show(errEl, false);
@@ -19,8 +21,8 @@
   }
 
   function setOk(msg) {
-    const okEl = $('#admin-ok');
-    const errEl = $('#admin-error');
+    const okEl = qs('#admin-ok');
+    const errEl = qs('#admin-error');
     show(errEl, false);
     if (!msg) {
       show(okEl, false);
@@ -28,6 +30,10 @@
     }
     okEl.textContent = msg;
     show(okEl, true);
+  }
+
+  function isStaffRole(role) {
+    return role === 'mod' || role === 'admin';
   }
 
   const STAFF_OPTIONS = [
@@ -39,7 +45,7 @@
   ];
 
   function renderUsers(users) {
-    const container = $('#admin-users');
+    const container = qs('#admin-users');
     if (!container) return;
     if (!users.length) {
       container.innerHTML = '<p class="muted">No users found.</p>';
@@ -121,13 +127,13 @@
       return;
     }
     setOk(`${data.user.username} is now Elite (Level 5)`);
-    await loadUsers($('#admin-search')?.value?.trim() || '');
+    await loadUsers(qs('#admin-search')?.value?.trim() || '');
     await loadAudit();
   }
 
   async function loadUsers(q = '') {
-    const qs = q ? `?q=${encodeURIComponent(q)}&limit=50` : '?limit=50';
-    const { ok, data } = await ITVAuth.api(`/api/admin/users${qs}`);
+    const qsParam = q ? `?q=${encodeURIComponent(q)}&limit=50` : '?limit=50';
+    const { ok, data } = await ITVAuth.api(`/api/admin/users${qsParam}`);
     if (!ok) {
       setError(data.error || 'Failed to load users');
       return;
@@ -136,7 +142,7 @@
   }
 
   async function loadAudit() {
-    const list = $('#admin-audit-list');
+    const list = qs('#admin-audit-list');
     if (!list) return;
     const { ok, data } = await ITVAuth.api('/api/admin/audit?limit=30');
     if (!ok) {
@@ -158,27 +164,65 @@
       .join('');
   }
 
-  async function init() {
-    const user = await ITVAuth.fetchMe();
-    if (!user) {
-      window.location.href = '/login.html';
+  function applyAccess(user) {
+    const title = qs('#overlay-admin-title');
+    const lead = qs('#admin-overlay-lead');
+    const denied = qs('#admin-overlay-denied');
+    const staffSection = qs('#admin-staff-section');
+    const mgmtSection = qs('#admin-mgmt-section');
+
+    setError('');
+    setOk('');
+    show(denied, false);
+
+    if (!user || !isStaffRole(user.staffRole)) {
+      if (title) title.textContent = 'Admin';
+      if (lead) lead.textContent = 'Staff permissions required.';
+      show(staffSection, false);
+      show(mgmtSection, false);
+      show(denied, true);
       return;
     }
-    if (user.staffRole !== 'admin') {
-      setError('Admin permissions required');
-      return;
+
+    const isAdmin = user.staffRole === 'admin';
+    if (title) title.textContent = isAdmin ? 'Admin' : 'Staff';
+    if (lead) {
+      lead.textContent = isAdmin
+        ? 'Room controls, user management, and audit log.'
+        : 'Room controls and moderation tools.';
     }
-
-    ITVAuth.renderNav($('#nav-user'), { user });
-
-    $('#admin-search-form')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      void loadUsers($('#admin-search')?.value?.trim() || '');
-    });
-
-    await loadUsers();
-    await loadAudit();
+    show(staffSection, true);
+    show(mgmtSection, isAdmin);
   }
 
-  init();
-})();
+  function wireEvents() {
+    if (wired || !root) return;
+    wired = true;
+
+    qs('#admin-search-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      void loadUsers(qs('#admin-search')?.value?.trim() || '');
+    });
+  }
+
+  function mount(container) {
+    root = container;
+    wireEvents();
+  }
+
+  async function refresh() {
+    if (!root) return;
+    const user = await ITVAuth.fetchMe();
+    applyAccess(user);
+    if (user?.staffRole === 'admin') {
+      await loadUsers();
+      await loadAudit();
+    }
+  }
+
+  global.ITVAdmin = { mount, refresh };
+
+  if (document.getElementById('admin-users') && !document.getElementById('site-overlay')) {
+    window.location.replace('/index.html?overlay=admin');
+  }
+})(window);

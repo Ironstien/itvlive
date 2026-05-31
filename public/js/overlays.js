@@ -24,6 +24,10 @@
       global.ITVProfile.refresh();
     }
 
+    if (panelId === 'admin' && global.ITVAdmin) {
+      global.ITVAdmin.refresh();
+    }
+
     overlay.querySelectorAll('.overlay-panel').forEach((p) => show(p, false));
     show(panel, true);
     show(overlay, true);
@@ -71,6 +75,10 @@
           hooks.onLogout?.();
         },
       });
+    }
+
+    if (global.ITVAdmin) {
+      global.ITVAdmin.mount($('#overlay-admin'));
     }
 
     const params = new URLSearchParams(window.location.search);

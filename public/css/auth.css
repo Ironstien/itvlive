@@ -197,6 +197,10 @@ a.nav-logout {
   overflow-y: auto;
 }
 
+.site-overlay__dialog:has(#overlay-admin:not(.hidden)) {
+  max-width: min(720px, calc(100vw - 2rem));
+}
+
 .overlay-panel {
   margin: 0;
 }
@@ -231,6 +235,61 @@ a.nav-logout {
 
 .overlay-panel .cta:hover {
   background: var(--purple-bright);
+}
+
+.overlay-admin .admin-section-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--purple-bright);
+}
+
+.admin-staff-section,
+.admin-mgmt-section {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--void-border);
+}
+
+.admin-staff-tools__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-staff-tools__controls .effect-block {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--void-border);
+  border-radius: var(--radius);
+  background: var(--void-deep);
+}
+
+.admin-staff-tools__controls .effect-block select {
+  min-width: 5.5rem;
+  max-width: 7rem;
+}
+
+.admin-staff-tools__controls .btn-skip-test {
+  padding: 0.28rem 0.45rem;
+  font-size: 0.68rem;
+}
+
+.overlay-admin .admin-users {
+  margin-bottom: 1.25rem;
+}
+
+.overlay-admin .admin-audit {
+  margin-bottom: 0;
+}
+
+.overlay-admin .admin-audit h3 {
+  margin-top: 0;
 }
 
 .nav-links button.nav-link {

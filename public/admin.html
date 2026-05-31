@@ -2,48 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0; url=/index.html?overlay=admin" />
     <title>Admin — INTO THE VOID</title>
-    <link rel="stylesheet" href="/css/variables.css" />
-    <link rel="stylesheet" href="/css/layout.css" />
-    <link rel="stylesheet" href="/css/components.css" />
-    <link rel="stylesheet" href="/css/auth.css" />
+    <link rel="icon" href="/img/favicon.png" type="image/png" />
+    <script>window.location.replace('/index.html?overlay=admin');</script>
   </head>
-  <body class="page-auth">
-    <header class="site-nav">
-      <a href="/index.html" class="logo">INTO THE VOID</a>
-      <ul class="nav-links">
-        <li><a href="/home.html">Home</a></li>
-        <li><a href="/index.html">Main Stage</a></li>
-      </ul>
-      <div class="nav-user" id="nav-user"></div>
-    </header>
-
-    <main class="auth-main admin-main">
-      <div class="admin-card auth-card">
-        <h1>Admin Panel</h1>
-        <p class="auth-lead">Manage staff roles, tokens, and view the audit log.</p>
-        <p id="admin-error" class="auth-error hidden" role="alert"></p>
-        <p id="admin-ok" class="auth-ok hidden" role="status"></p>
-
-        <form id="admin-search-form" class="admin-search">
-          <label>
-            Search users
-            <input type="search" id="admin-search" placeholder="Username or email…" autocomplete="off" />
-          </label>
-          <button type="submit" class="btn-primary btn-sm">Search</button>
-        </form>
-
-        <div id="admin-users" class="admin-users"></div>
-
-        <section class="admin-audit">
-          <h2>Recent actions</h2>
-          <ul id="admin-audit-list" class="admin-audit-list"></ul>
-        </section>
-      </div>
-    </main>
-
-    <script src="/js/auth.js"></script>
-    <script src="/js/admin.js"></script>
+  <body>
+    <p><a href="/index.html?overlay=admin">Continue to Main Stage…</a></p>
   </body>
 </html>

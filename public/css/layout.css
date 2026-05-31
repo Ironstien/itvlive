@@ -468,54 +468,6 @@ a:hover {
   justify-content: center;
 }
 
-.staff-tools-panel {
-  pointer-events: auto;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.2rem 0.35rem;
-  background: rgba(14, 12, 20, 0.88);
-  border: 1px solid var(--void-border);
-  border-radius: var(--radius);
-  box-sizing: border-box;
-}
-
-.staff-tools-panel__label {
-  flex-shrink: 0;
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--purple-bright);
-  padding-right: 0.15rem;
-  border-right: 1px solid var(--void-border);
-  margin-right: 0.05rem;
-}
-
-.staff-tools-panel__controls {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.staff-tools-panel .effect-block {
-  padding: 0.15rem 0.35rem;
-}
-
-.staff-tools-panel .effect-block select {
-  min-width: 5.5rem;
-  max-width: 7rem;
-}
-
-.staff-tools-panel .btn-skip-test {
-  padding: 0.28rem 0.45rem;
-  font-size: 0.68rem;
-}
-
 .player-stage__slot--below {
   grid-row: 3;
   align-self: start;

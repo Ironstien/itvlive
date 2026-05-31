@@ -123,6 +123,7 @@
     return {
       onChangeName: showNameModal,
       onOpenProfile: () => ITVOverlays.open('profile'),
+      onOpenAdmin: () => ITVOverlays.open('admin'),
       onLogout: () => {
         if (socket?.connected) socket.disconnect();
         loggedInUser = null;
